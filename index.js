@@ -59,6 +59,7 @@ function createProgram(gl, vertexShader, fragmentShader) {
 }
 
 function updateTexture(data, width, height) {
+  consol.log('triggered', data)
   gl.bindTexture(gl.TEXTURE_2D, texture);
   gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, data);
 }
@@ -73,7 +74,7 @@ function getRandomPixel() {
 }
 
 async function loadZigWasmModule() {
-  const response = await fetch('/module.wasm');
+  const response = await fetch('/zig-out/bin/zigl.wasm');
   const bytes = await response.arrayBuffer();
   const { instance } = await WebAssembly.instantiate(bytes, {
     env: {
@@ -143,7 +144,6 @@ function main() {
   }
 
   function animate() {
-    console.log('rendering')
     render();
     window.requestAnimationFrame(animate);
   }
@@ -151,30 +151,30 @@ function main() {
   window.requestAnimationFrame(animate);
 
   // Example of updating the texture after 2 seconds
-  setInterval(() => {
-    const newData = new Uint8Array([
-      ...getRandomPixel(),
-      ...getRandomPixel(),
-      ...getRandomPixel(),
-      ...getRandomPixel(),
-      ...getRandomPixel(),
-      ...getRandomPixel(),
-      ...getRandomPixel(),
-      ...getRandomPixel(),
-      ...getRandomPixel(),
-      ...getRandomPixel(),
-      ...getRandomPixel(),
-      ...getRandomPixel(),
-      ...getRandomPixel(),
-      ...getRandomPixel(),
-      ...getRandomPixel(),
-      ...getRandomPixel(),
-    ]);
-    updateTexture(newData, 4, 4);
-  }, 256);
+  // setInterval(() => {
+  //   const newData = new Uint8Array([
+  //     ...getRandomPixel(),
+  //     ...getRandomPixel(),
+  //     ...getRandomPixel(),
+  //     ...getRandomPixel(),
+  //     ...getRandomPixel(),
+  //     ...getRandomPixel(),
+  //     ...getRandomPixel(),
+  //     ...getRandomPixel(),
+  //     ...getRandomPixel(),
+  //     ...getRandomPixel(),
+  //     ...getRandomPixel(),
+  //     ...getRandomPixel(),
+  //     ...getRandomPixel(),
+  //     ...getRandomPixel(),
+  //     ...getRandomPixel(),
+  //     ...getRandomPixel(),
+  //   ]);
+  //   updateTexture(newData, 4, 4);
+  // }, 256);
   
 }
 
 main();
-loadZigWasmModule()
+setTimeout(loadZigWasmModule, 1000);
 
