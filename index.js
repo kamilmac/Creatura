@@ -12,6 +12,7 @@ function createCanvas(parentDivId, canvasWidth, canvasHeight) {
 
 const canvas = createCanvas('root', CANVAS_WIDTH, CANVAS_HEIGHT);
 const gl = canvas.getContext('webgl');
+const texture = gl.createTexture();
 
 const vertexShaderSource = `
 attribute vec4 a_position;
@@ -57,7 +58,7 @@ function createProgram(gl, vertexShader, fragmentShader) {
   return program;
 }
 
-function updateTexture(gl, texture, data, width, height) {
+function updateTexture(data, width, height) {
   gl.bindTexture(gl.TEXTURE_2D, texture);
   gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, data);
 }
@@ -72,7 +73,7 @@ function getRandomPixel() {
 }
 
 async function loadZigWasmModule() {
-  const response = await fetch('path/to/your/zig/module.wasm');
+  const response = await fetch('/module.wasm');
   const bytes = await response.arrayBuffer();
   const { instance } = await WebAssembly.instantiate(bytes, {
     env: {
@@ -116,8 +117,6 @@ function main() {
     1, 1,
   ]);
   gl.bufferData(gl.ARRAY_BUFFER, texCoords, gl.STATIC_DRAW);
-
-  const texture = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, texture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 4, 4, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
@@ -171,9 +170,11 @@ function main() {
       ...getRandomPixel(),
       ...getRandomPixel(),
     ]);
-    updateTexture(gl, texture, newData, 4, 4);
+    updateTexture(newData, 4, 4);
   }, 256);
   
 }
 
 main();
+loadZigWasmModule()
+
