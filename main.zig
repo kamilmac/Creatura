@@ -1,10 +1,17 @@
 const std = @import("std");
 
 extern fn updateTexture(data: [*]const u8, width: u32, height: u32) void;
+// extern fn log(ptr: [*]const u8, len: usize) void;
 
-pub fn main() void {
+// fn logFromZig() void {
+//     const msg = "Hello from Zig!";
+//     log(msg.ptr, msg.len);
+// }
+
+export fn go() void {
     var newData: [64]u8 = undefined; // 4x4 pixels, each with 4 u8 values (RGBA)
     var index: usize = 0;
+    // logFromZig();
     while (index < newData.len) : (index += 4) {
         const pixel = getRandomPixel();
         newData[index + 0] = pixel[0];

@@ -12,11 +12,10 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = .ReleaseSmall,
     });
-
     // <https://github.com/ziglang/zig/issues/8633>
     // exe.global_base = 6560;
-    // exe.entry = .disabled;
-    // exe.rdynamic = true;
+    exe.entry = .disabled;
+    exe.rdynamic = true;
     // exe.import_memory = true;
     // exe.stack_size = std.wasm.page_size;
     // exe.initial_memory = std.wasm.page_size * 2;

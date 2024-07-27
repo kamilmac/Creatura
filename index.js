@@ -59,7 +59,8 @@ function createProgram(gl, vertexShader, fragmentShader) {
 }
 
 function updateTexture(data, width, height) {
-  consol.log('triggered', data)
+  window.pass = data;
+  console.log('triggered', data)
   gl.bindTexture(gl.TEXTURE_2D, texture);
   gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, data);
 }
@@ -79,7 +80,7 @@ async function loadZigWasmModule() {
   const { instance } = await WebAssembly.instantiate(bytes, {
     env: {
       updateTexture,
-      gl,
+      // log: console.log,
     }
   });
   return instance;
@@ -149,32 +150,11 @@ function main() {
   }
 
   window.requestAnimationFrame(animate);
-
-  // Example of updating the texture after 2 seconds
-  // setInterval(() => {
-  //   const newData = new Uint8Array([
-  //     ...getRandomPixel(),
-  //     ...getRandomPixel(),
-  //     ...getRandomPixel(),
-  //     ...getRandomPixel(),
-  //     ...getRandomPixel(),
-  //     ...getRandomPixel(),
-  //     ...getRandomPixel(),
-  //     ...getRandomPixel(),
-  //     ...getRandomPixel(),
-  //     ...getRandomPixel(),
-  //     ...getRandomPixel(),
-  //     ...getRandomPixel(),
-  //     ...getRandomPixel(),
-  //     ...getRandomPixel(),
-  //     ...getRandomPixel(),
-  //     ...getRandomPixel(),
-  //   ]);
-  //   updateTexture(newData, 4, 4);
-  // }, 256);
-  
 }
 
 main();
-setTimeout(loadZigWasmModule, 1000);
+loadZigWasmModule().then((wasm) => {
+  console.log({wasm})
+  wasm.exports.go();
+})
 
