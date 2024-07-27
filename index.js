@@ -1,3 +1,6 @@
+const CANVAS_HEIGHT = 800;
+const CANVAS_WIDTH = 800;
+
 function createCanvas(parentDivId, canvasWidth, canvasHeight) {
   const parentDiv = document.getElementById(parentDivId);
   const canvas = document.createElement('canvas');
@@ -7,10 +10,8 @@ function createCanvas(parentDivId, canvasWidth, canvasHeight) {
   return canvas;
 };
 
-const CANVAS_HEIGHT = 800;
-const CANVAS_WIDTH = 800;
-
 const canvas = createCanvas('root', CANVAS_WIDTH, CANVAS_HEIGHT);
+const gl = canvas.getContext('webgl');
 
 const vertexShaderSource = `
 attribute vec4 a_position;
@@ -61,9 +62,28 @@ function updateTexture(gl, texture, data, width, height) {
   gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, data);
 }
 
-function main() {
-  const gl = canvas.getContext('webgl');
+function getRandomPixel() {
+  return [
+    Math.floor(Math.random() * 256),
+    Math.floor(Math.random() * 256),
+    Math.floor(Math.random() * 256),
+    255,
+  ];
+}
 
+async function loadZigWasmModule() {
+  const response = await fetch('path/to/your/zig/module.wasm');
+  const bytes = await response.arrayBuffer();
+  const { instance } = await WebAssembly.instantiate(bytes, {
+    env: {
+      updateTexture,
+      gl,
+    }
+  });
+  return instance;
+}
+
+function main() {
   if (!gl) {
     console.error('WebGL not supported');
     return;
@@ -123,12 +143,13 @@ function main() {
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
-  function repaintTexture(newData) {
-    updateTexture(gl, texture, newData, 4, 4);
+  function animate() {
+    console.log('rendering')
     render();
+    window.requestAnimationFrame(animate);
   }
 
-  render();
+  window.requestAnimationFrame(animate);
 
   // Example of updating the texture after 2 seconds
   setInterval(() => {
@@ -150,17 +171,9 @@ function main() {
       ...getRandomPixel(),
       ...getRandomPixel(),
     ]);
-    repaintTexture(newData);
+    updateTexture(gl, texture, newData, 4, 4);
   }, 256);
-}
-
-function getRandomPixel() {
-  return [
-    Math.floor(Math.random() * 256),
-    Math.floor(Math.random() * 256),
-    Math.floor(Math.random() * 256),
-    255,
-  ];
+  
 }
 
 main();
