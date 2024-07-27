@@ -59,14 +59,6 @@ function createProgram(gl, vertexShader, fragmentShader) {
   return program;
 }
 
-function updateTexture(data, width, height) {
-  window.pass = data;
-  const arr = new Uint8Array(wasm.exports.memory.buffer, data, 64)
-  console.log('triggered', arr)
-  gl.bindTexture(gl.TEXTURE_2D, texture);
-  gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, arr);
-}
-
 function getRandomPixel() {
   return [
     Math.floor(Math.random() * 256),
@@ -140,15 +132,12 @@ function main() {
   const textureLocation = gl.getUniformLocation(program, 'u_texture');
   gl.uniform1i(textureLocation, 0);
 
-  function render() {
+  function animate() {
+    const arr = new Uint8Array(wasm.exports.memory.buffer, wasm.exports.go(), 64)
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 4, 4, gl.RGBA, gl.UNSIGNED_BYTE, arr);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
-  }
-
-  function animate() {
-    const val = wasm.exports.go();
-    updateTexture(val, 4, 4);
-    render();
     window.requestAnimationFrame(animate);
   }
 

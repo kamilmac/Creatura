@@ -2,8 +2,9 @@ const std = @import("std");
 
 var rng = std.rand.DefaultPrng.init(0);
 
+var newData: [64]u8 = undefined; // 4x4 pixels, each with 4 u8 values (RGBA)
+
 export fn go() [*]const u8 {
-    var newData: [64]u8 = undefined; // 4x4 pixels, each with 4 u8 values (RGBA)
     var index: usize = 0;
     while (index < newData.len) : (index += 4) {
         const pixel = getRandomPixel();
