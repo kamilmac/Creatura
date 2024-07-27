@@ -132,10 +132,13 @@ function main() {
   const textureLocation = gl.getUniformLocation(program, 'u_texture');
   gl.uniform1i(textureLocation, 0);
 
-  function animate() {
-    const arr = new Uint8Array(wasm.exports.memory.buffer, wasm.exports.go(), 64)
+  let prevTime = 0;
+  function animate(timeSinceStart) {
+    console.log(timeSinceStart - prevTime)
+    prevTime = timeSinceStart;
+    const pixels = new Uint8Array(wasm.exports.memory.buffer, wasm.exports.go(timeSinceStart), 64)
     gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 4, 4, gl.RGBA, gl.UNSIGNED_BYTE, arr);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 4, 4, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     window.requestAnimationFrame(animate);
