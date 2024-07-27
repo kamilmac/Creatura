@@ -13,7 +13,7 @@ function createCanvas(parentDivId, canvasWidth, canvasHeight) {
 const canvas = createCanvas('root', CANVAS_WIDTH, CANVAS_HEIGHT);
 const gl = canvas.getContext('webgl');
 const texture = gl.createTexture();
-let memory = undefined;
+let wasm = undefined;
 
 const vertexShaderSource = `
 attribute vec4 a_position;
@@ -61,7 +61,7 @@ function createProgram(gl, vertexShader, fragmentShader) {
 
 function updateTexture(data, width, height) {
   window.pass = data;
-  const arr = new Uint8Array(memory.buffer, data, 64)
+  const arr = new Uint8Array(wasm.exports.memory.buffer, data, 64)
   console.log('triggered', arr)
   gl.bindTexture(gl.TEXTURE_2D, texture);
   gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, arr);
@@ -81,7 +81,7 @@ async function loadZigWasmModule() {
   const bytes = await response.arrayBuffer();
   const { instance } = await WebAssembly.instantiate(bytes, {
     env: {
-      updateTexture,
+      // updateTexture,
     }
   });
   return instance;
@@ -146,17 +146,17 @@ function main() {
   }
 
   function animate() {
+    const val = wasm.exports.go();
+    updateTexture(val, 4, 4);
     render();
     window.requestAnimationFrame(animate);
   }
 
-  window.requestAnimationFrame(animate);
+  animate();
 }
 
-main();
-loadZigWasmModule().then((wasm) => {
-  console.log({wasm})
-  memory = wasm.exports.memory;  
-  wasm.exports.go();
-})
+  loadZigWasmModule().then((wasmm) => {
+    wasm = wasmm;
+    main();
+  })
 
