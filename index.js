@@ -139,7 +139,7 @@ function main() {
       const data =wasm.exports.go(timeSinceStart);
       const pixels = new Uint8Array(
         wasm.exports.memory.buffer,
-        data, 
+        data - 2100, 
         CANVAS_WIDTH * CANVAS_HEIGHT * 4,
       )
       gl.bindTexture(gl.TEXTURE_2D, texture);
