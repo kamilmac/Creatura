@@ -33,9 +33,9 @@ export fn init(width: u32, height: u32) void {
     buffer = std.heap.page_allocator.alloc(u8, total_size) catch unreachable;
     var index: usize = 0;
     while (index < buffer.len) : (index += 4) {
-        buffer[index + 0] = 255;
-        buffer[index + 1] = 255;
-        buffer[index + 2] = 255;
+        buffer[index + 0] = 0;
+        buffer[index + 1] = 0;
+        buffer[index + 2] = 0;
         buffer[index + 3] = 0;
     }
 }
@@ -48,11 +48,17 @@ export fn go(timeSinceStart: f32) *[]const u8 {
     if (timeSinceStart > 6000) {
         // return undefined;
     }
-    const p = createBlurryPoint() catch {
-        return &buffer; // Exit main function after handling the error
-    };
-    spriteToBuffer(p);
-    freeSprite(p); // Free the sprite after it is no longer needed
+
+    // #1
+    // const p = createBlurryPoint() catch {
+    //     return &buffer; // Exit main function after handling the error
+    // };
+    // spriteToBuffer(p);
+    // freeSprite(p); // Free the sprite after it is no longer needed
+    //
+
+    // #2
+    drawRandomCircles();
     return &buffer;
 }
 
@@ -105,19 +111,67 @@ fn spriteToBuffer(s: Sprite) void {
     for (s.p) |pixel| {
         const x = pixel.x + s.x;
         const y = pixel.y + s.y;
-        if (x >= 0 and y >= 0 and x < canvas.width and y < canvas.height) {
-            const buffer_index: u32 = (@as(u32, @intCast(y)) * canvas.width + @as(u32, @intCast(x))) * 4;
-            if (buffer_index + 3 < buffer.len and pixel.v > 0) {
-                buffer[buffer_index + 0] = 0; // Red
-                buffer[buffer_index + 1] = 0; // Green
-                buffer[buffer_index + 2] = 0; // Blue
-                // buffer[buffer_index + 3] = pixel.v; // Alpha
-                buffer[buffer_index + 3] = pixel.v + buffer[buffer_index + 3]; // Alpha
-            }
-        }
+        drawPixelToBuffer(x, y, pixel.v);
     }
 }
 
 fn freeSprite(sprite: Sprite) void {
     std.heap.page_allocator.free(sprite.p);
+}
+
+fn drawRandomCircles() void {
+    const numOfCircles = 8;
+    const maxRadius = 160;
+
+    var index: u32 = 0;
+
+    while (index < numOfCircles) {
+        const posx = rng.random().uintAtMost(u32, canvas.width);
+        const posy = rng.random().uintAtMost(u32, canvas.height);
+        const r = rng.random().uintAtMost(u8, maxRadius);
+        drawCircle(@intCast(posx), @intCast(posy), r);
+        index += 1;
+    }
+}
+
+fn drawCircle(cx: i32, cy: i32, radius: i32) void {
+    var x: i32 = radius;
+    var y: i32 = 0;
+    var decision_over2: i32 = 1 - x; // Decision criterion divided by 2 evaluated at (radius, 0)
+
+    while (x >= y) {
+        // Drawing all the points in all octants of the circle
+        drawPixelToBuffer(cx + x, cy + y, 255);
+        drawPixelToBuffer(cx + y, cy + x, 255);
+        drawPixelToBuffer(cx - y, cy + x, 255);
+        drawPixelToBuffer(cx - x, cy + y, 255);
+        drawPixelToBuffer(cx - x, cy - y, 255);
+        drawPixelToBuffer(cx - y, cy - x, 255);
+        drawPixelToBuffer(cx + y, cy - x, 255);
+        drawPixelToBuffer(cx + x, cy - y, 255);
+
+        y += 1;
+        if (decision_over2 <= 0) {
+            decision_over2 += 2 * y + 1; // Change in decision criterion for y -> y+1
+        } else {
+            x -= 1;
+            decision_over2 += 2 * (y - x) + 1; // Change for y -> y+1 and x -> x-1
+        }
+    }
+    if (radius > 8) {
+        drawCircle(cx, cy, radius - 1);
+    }
+}
+
+fn drawPixelToBuffer(x: i32, y: i32, brightness: u8) void {
+    if (x >= 0 and y >= 0 and x < canvas.width and y < canvas.height) {
+        const buffer_index: u32 = (@as(u32, @intCast(y)) * canvas.width + @as(u32, @intCast(x))) * 4;
+        if (buffer_index + 3 < buffer.len) {
+            buffer[buffer_index + 0] = brightness / 3 + buffer[buffer_index + 0]; // Red
+            buffer[buffer_index + 1] = brightness / 2 + buffer[buffer_index + 1]; // Green
+            buffer[buffer_index + 2] = brightness / 2 + buffer[buffer_index + 2]; // Blue
+            // buffer[buffer_index + 3] = pixel.v; // Alpha
+            buffer[buffer_index + 3] = 255; // Alpha
+        }
+    }
 }
