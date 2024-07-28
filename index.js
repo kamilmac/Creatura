@@ -64,7 +64,11 @@ async function loadZigWasmModule() {
   const bytes = await response.arrayBuffer();
   const { instance } = await WebAssembly.instantiate(bytes, {
     env: {
-      // updateTexture,
+      js_console_log: (ptr, len) => {
+        const buf = new Uint8Array(wasm.exports.memory.buffer, ptr, len);
+        const message = new TextDecoder().decode(buf);
+        console.log('ZIG: ', message);
+      }
     }
   });
   return instance;
@@ -126,17 +130,24 @@ function main() {
   gl.uniform1i(textureLocation, 0);
 
   wasm.exports.init(CANVAS_WIDTH, CANVAS_HEIGHT);
+
   function animate(timeSinceStart) {
-    if (timeSinceStart > 6000) {
+    if (timeSinceStart > 80000) {
       return;
     }
-    const pixels = new Uint8Array(wasm.exports.memory.buffer, wasm.exports.go(timeSinceStart), 
-      CANVAS_WIDTH * CANVAS_HEIGHT * 4,
-    )
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
+    try {
+      const data =wasm.exports.go(timeSinceStart);
+      const pixels = new Uint8Array(
+        wasm.exports.memory.buffer,
+        data, 
+        CANVAS_WIDTH * CANVAS_HEIGHT * 4,
+      )
+      gl.bindTexture(gl.TEXTURE_2D, texture);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+    } catch (e) {
+      console.warn(e)
+    }
     window.requestAnimationFrame(animate);
   }
 
