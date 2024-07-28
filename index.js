@@ -1,5 +1,5 @@
-const CANVAS_HEIGHT = 800;
-const CANVAS_WIDTH = 800;
+const CANVAS_HEIGHT = 1024;
+const CANVAS_WIDTH = 1024;
 
 function createCanvas(parentDivId, canvasWidth, canvasHeight) {
   const parentDiv = document.getElementById(parentDivId);
@@ -59,15 +59,6 @@ function createProgram(gl, vertexShader, fragmentShader) {
   return program;
 }
 
-function getRandomPixel() {
-  return [
-    Math.floor(Math.random() * 256),
-    Math.floor(Math.random() * 256),
-    Math.floor(Math.random() * 256),
-    255,
-  ];
-}
-
 async function loadZigWasmModule() {
   const response = await fetch('/zig-out/bin/zigl.wasm');
   const bytes = await response.arrayBuffer();
@@ -113,7 +104,9 @@ function main() {
   ]);
   gl.bufferData(gl.ARRAY_BUFFER, texCoords, gl.STATIC_DRAW);
   gl.bindTexture(gl.TEXTURE_2D, texture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 4, 4, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, CANVAS_WIDTH, CANVAS_HEIGHT, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  
+  // Rest of the code continues from here
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
 
@@ -133,12 +126,15 @@ function main() {
   gl.uniform1i(textureLocation, 0);
 
   let prevTime = 0;
+  wasm.exports.init(CANVAS_WIDTH, CANVAS_HEIGHT);
   function animate(timeSinceStart) {
     console.log(timeSinceStart - prevTime)
     prevTime = timeSinceStart;
-    const pixels = new Uint8Array(wasm.exports.memory.buffer, wasm.exports.go(timeSinceStart), 64)
+    const pixels = new Uint8Array(wasm.exports.memory.buffer, wasm.exports.go(timeSinceStart), 
+      CANVAS_WIDTH * CANVAS_HEIGHT * 4,
+    )
     gl.bindTexture(gl.TEXTURE_2D, texture);
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, 4, 4, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
     window.requestAnimationFrame(animate);

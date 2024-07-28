@@ -2,9 +2,15 @@ const std = @import("std");
 
 var rng = std.rand.DefaultPrng.init(0);
 
-var newData: [64]u8 = undefined; // 4x4 pixels, each with 4 u8 values (RGBA)
+var newData: []u8 = undefined;
 
-export fn go(timeSinceStart: f32) [*]const u8 {
+export fn init(width: u32, height: u32) [*]u8 {
+    const total_size = width * height * 4;
+    newData = std.heap.page_allocator.alloc(u8, total_size) catch unreachable;
+    return newData.ptr;
+}
+
+export fn go(timeSinceStart: f32) *[]const u8 {
     var index: usize = 0;
     if (timeSinceStart < 1000) {
         return undefined;
@@ -16,7 +22,7 @@ export fn go(timeSinceStart: f32) [*]const u8 {
         newData[index + 2] = pixel[2];
         newData[index + 3] = pixel[3];
     }
-    return newData[0..];
+    return &newData;
 }
 
 fn getRandomPixel() [4]u8 {
