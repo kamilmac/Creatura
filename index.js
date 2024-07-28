@@ -125,11 +125,11 @@ function main() {
   const textureLocation = gl.getUniformLocation(program, 'u_texture');
   gl.uniform1i(textureLocation, 0);
 
-  let prevTime = 0;
   wasm.exports.init(CANVAS_WIDTH, CANVAS_HEIGHT);
   function animate(timeSinceStart) {
-    console.log(timeSinceStart - prevTime)
-    prevTime = timeSinceStart;
+    if (timeSinceStart > 6000) {
+      return;
+    }
     const pixels = new Uint8Array(wasm.exports.memory.buffer, wasm.exports.go(timeSinceStart), 
       CANVAS_WIDTH * CANVAS_HEIGHT * 4,
     )

@@ -1,18 +1,26 @@
 const std = @import("std");
 
-var rng = std.rand.DefaultPrng.init(0);
+const Canvas = struct {
+    height: u32,
+    width: u32,
+};
 
+var rng = std.rand.DefaultPrng.init(0);
+var canvas: Canvas = undefined;
 var newData: []u8 = undefined;
 
-export fn init(width: u32, height: u32) [*]u8 {
-    const total_size = width * height * 4;
+export fn init(width: u32, height: u32) void {
+    canvas = Canvas{
+        .width = width,
+        .height = height,
+    };
+    const total_size = canvas.width * canvas.height * 4;
     newData = std.heap.page_allocator.alloc(u8, total_size) catch unreachable;
-    return newData.ptr;
 }
 
 export fn go(timeSinceStart: f32) *[]const u8 {
     var index: usize = 0;
-    if (timeSinceStart < 1000) {
+    if (timeSinceStart > 6000) {
         return undefined;
     }
     while (index < newData.len) : (index += 4) {
