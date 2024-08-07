@@ -16,21 +16,29 @@ const AttractorForce = struct {
     x: f32,
     y: f32,
     radius: f32 = 1.0,
+    points: std.ArrayList(*Point),
 
-    pub fn init(x: f32, y: f32) AttractorForce {
+    pub fn init(allocator: std.mem.Allocator, x: f32, y: f32) AttractorForce {
         return AttractorForce{
             .x = x,
             .y = y,
+            .points = std.ArrayList(*Point).init(allocator),
         };
     }
 
-    pub fn process(self: *AttractorForce, point: *Point) void {
-        const dx = self.x - point.x;
-        const dy = self.y - point.y;
-        const distanceSquared = dx * dx + dy * dy;
-        if (distanceSquared <= self.radius * self.radius) {
-            point.x += dx / 40;
-            point.y += dy / 40;
+    pub fn connectPoint(self: *AttractorForce, p: *Point) !void {
+        try self.points.append(p);
+    }
+
+    pub fn process(self: *AttractorForce) void {
+        for (self.points.items) |point| {
+            const dx = self.x - point.x;
+            const dy = self.y - point.y;
+            const distanceSquared = dx * dx + dy * dy;
+            if (distanceSquared <= self.radius * self.radius) {
+                point.x += dx / 40;
+                point.y += dy / 40;
+            }
         }
     }
 };
@@ -114,8 +122,13 @@ var app: App = undefined;
 export fn init(width: u32, height: u32) void {
     app = App.init(std.heap.page_allocator, width, height) catch unreachable;
     defer app.deinit();
-    _ = app.addForce(AttractorForce.init(0.6, 0.6)) catch unreachable;
-    _ = app.addPoint(0.0, 0.0) catch unreachable;
+    const a1 = app.addForce(AttractorForce.init(app.allocator, 0.6, 0.6)) catch unreachable;
+    const a2 = app.addForce(AttractorForce.init(app.allocator, 0.0, 0.6)) catch unreachable;
+    const a3 = app.addForce(AttractorForce.init(app.allocator, 0.6, -0.6)) catch unreachable;
+    const p1 = app.addPoint(0.0, 0.0) catch unreachable;
+    _ = a1.connectPoint(p1) catch unreachable;
+    _ = a2.connectPoint(p1) catch unreachable;
+    _ = a3.connectPoint(p1) catch unreachable;
     app.clearBuffer();
 }
 
@@ -124,16 +137,13 @@ export fn go(timeSinceStart: f32) [*]const u8 {
         // You might want to add some behavior here
     }
 
-    if (app.forces.items.len > 0 and app.points.items.len > 0) {
-        app.forces.items[0].process(app.points.items[0]);
-    }
-
     for (app.points.items) |point| {
         app.drawPointToBuffer(point.x, point.y, 255);
     }
 
-    for (app.forces.items) |force| {
-        app.drawPointToBuffer(force.x, force.y, 0);
+    for (app.forces.items) |item| {
+        item.process();
+        app.drawPointToBuffer(item.x, item.y, 0);
     }
 
     return app.buffer.ptr;
