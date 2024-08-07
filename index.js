@@ -1,5 +1,5 @@
-const CANVAS_HEIGHT = 1024;
-const CANVAS_WIDTH = 1024;
+const CANVAS_HEIGHT = 800;
+const CANVAS_WIDTH = 800;
 
 function createCanvas(parentDivId, canvasWidth, canvasHeight) {
   const parentDiv = document.getElementById(parentDivId);
@@ -136,15 +136,17 @@ function main() {
       return;
     }
     try {
-      const data =wasm.exports.go(timeSinceStart);
+      const data = wasm.exports.go(timeSinceStart);
       const pixels = new Uint8Array(
         wasm.exports.memory.buffer,
-        data - 2100, 
+        data, 
         CANVAS_WIDTH * CANVAS_HEIGHT * 4,
       )
+
       gl.bindTexture(gl.TEXTURE_2D, texture);
       gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, CANVAS_WIDTH, CANVAS_HEIGHT, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
       gl.drawArrays(gl.TRIANGLES, 0, 6);
+      console.log({wasm, data, pixels })
     } catch (e) {
       console.warn(e)
     }
@@ -154,8 +156,8 @@ function main() {
   animate();
 }
 
-  loadZigWasmModule().then((wasmm) => {
-    wasm = wasmm;
-    main();
-  })
+loadZigWasmModule().then((wasmm) => {
+  wasm = wasmm;
+  main();
+});
 
