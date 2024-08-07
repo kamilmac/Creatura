@@ -1,5 +1,5 @@
-const CANVAS_HEIGHT = 800;
-const CANVAS_WIDTH = 800;
+const CANVAS_HEIGHT = 512;
+const CANVAS_WIDTH = 512;
 
 function createCanvas(parentDivId, canvasWidth, canvasHeight) {
   const parentDiv = document.getElementById(parentDivId);
@@ -131,11 +131,21 @@ function main() {
 
   wasm.exports.init(CANVAS_WIDTH, CANVAS_HEIGHT);
 
+  const FRAME_RATE = 60;
+  const FRAME_DURATION = 1000 / FRAME_RATE;
+  let lastFrameTime = 0;
+
   function animate(timeSinceStart) {
-    if (timeSinceStart > 80000) {
-      return;
-    }
+    // if (timeSinceStart > 80000) {
+    //   return;
+    // }
     try {
+      const deltaTime = timeSinceStart - lastFrameTime;
+      if (deltaTime < FRAME_DURATION) {
+        window.requestAnimationFrame(animate);
+        return;
+      }
+      lastFrameTime = timeSinceStart;
       const data = wasm.exports.go(timeSinceStart);
       const pixels = new Uint8Array(
         wasm.exports.memory.buffer,
@@ -161,3 +171,12 @@ loadZigWasmModule().then((wasmm) => {
   main();
 });
 
+/**
+  Points
+    Point
+    Point
+    Point
+  Forces
+
+  
+**/

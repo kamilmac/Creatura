@@ -7,213 +7,123 @@ const Canvas = struct {
     width: u32,
 };
 
-const Position = struct {
-    x: i32,
-    y: i32,
-};
-
-const Pixel = struct {
-    pos: Position,
-    val: u8,
-};
-
 const Point = struct {
-    pos: Position,
-    prevPos: Position = undefined,
-    id: i32,
+    x: f32,
+    y: f32,
 };
 
 const AttractorForce = struct {
-    pos: Position,
-    gravity: i32 = 8000,
-    radius: i32 = 500,
-    id: i32,
-    pub fn process(self: *const AttractorForce, p: *Point) void {
-        const dx = self.pos.x - p.pos.x;
-        const dy = self.pos.y - p.pos.y;
+    x: f32,
+    y: f32,
+    radius: f32 = 1.0,
+
+    pub fn init(x: f32, y: f32) AttractorForce {
+        return AttractorForce{
+            .x = x,
+            .y = y,
+        };
+    }
+
+    pub fn process(self: *AttractorForce, point: *Point) void {
+        const dx = self.x - point.x;
+        const dy = self.y - point.y;
         const distanceSquared = dx * dx + dy * dy;
         if (distanceSquared <= self.radius * self.radius) {
-            const force = @divTrunc(self.gravity * 100, distanceSquared + 1);
-            p.prevPos = p.pos;
-            // logInt(dx * force);
-            p.pos.x += @divTrunc(dx * force, 1000);
-            p.pos.y += @divTrunc(dy * force, 1000);
+            point.x += dx / 40;
+            point.y += dy / 40;
         }
     }
 };
 
+const App = struct {
+    points: std.ArrayList(Point),
+    forces: std.ArrayList(AttractorForce),
+    buffer: []u8,
+    canvas: Canvas,
+
+    pub fn init(allocator: std.mem.Allocator, width: u32, height: u32) !App {
+        var _app = App{
+            .points = std.ArrayList(Point).init(allocator),
+            .forces = std.ArrayList(AttractorForce).init(allocator),
+            .buffer = allocator.alloc(u8, width * height * 4) catch unreachable,
+            .canvas = Canvas{ .width = width, .height = height },
+        };
+
+        try _app.points.append(Point{ .x = 0.0, .y = 0.0 });
+        try _app.forces.append(AttractorForce.init(0.6, 0.6));
+
+        return _app;
+    }
+
+    pub fn deinit(self: *App) void {
+        self.points.deinit();
+        self.forces.deinit();
+    }
+};
+
 var rng = std.rand.DefaultPrng.init(0);
-var canvas: Canvas = undefined;
-var buffer: []u8 = undefined;
-var p1: Point = undefined;
-var a1: AttractorForce = undefined;
+var app: App = undefined;
 
 export fn init(width: u32, height: u32) void {
-    canvas = Canvas{
-        .width = width,
-        .height = height,
-    };
-    p1 = Point{
-        .pos = Position{ .x = 400, .y = 400 },
-        .id = 1,
-    };
-    a1 = AttractorForce{
-        .pos = Position{ .x = 200, .y = 200 },
-        .id = 1,
-    };
-    const total_size = canvas.width * canvas.height * 4;
-    buffer = std.heap.page_allocator.alloc(u8, total_size) catch unreachable;
+    const allocator = std.heap.page_allocator;
+    app = App.init(allocator, width, height) catch unreachable;
+
     var index: usize = 0;
-    while (index < buffer.len) : (index += 4) {
-        buffer[index + 0] = 100;
-        buffer[index + 1] = 255;
-        buffer[index + 2] = 123;
-        buffer[index + 3] = 128;
+    while (index < app.buffer.len) : (index += 4) {
+        app.buffer[index + 0] = 100;
+        app.buffer[index + 1] = 255;
+        app.buffer[index + 2] = 123;
+        app.buffer[index + 3] = 255;
     }
 }
 
 fn log(message: []const u8) void {
     js_console_log(message.ptr, message.len);
 }
+
 fn logInt(value: i32) void {
-    var buf: [32]u8 = undefined; // Temporary buffer for formatting
-    const formatted = std.fmt.bufPrint(buf[0..], "{d}", .{value}) catch {
-        // std.debug.print("Error logging integer: {}\n", .{err});
-        return;
-    };
+    var buf: [32]u8 = undefined;
+    const formatted = std.fmt.bufPrint(&buf, "{d}", .{value}) catch return;
     log(formatted);
 }
 
-// fn pointToPixel(p: *const Point) Pixel {
-//     const pixel = Pixel{
-//         .pos = p.pos,
-//         .val = 255,
-//     };
-//     return pixel;
-// }
+fn drawPointToBuffer(xx: f32, yy: f32, brightness: u8) void {
+    const cx: f32 = @floatFromInt(app.canvas.width);
+    const cy: f32 = @floatFromInt(app.canvas.height);
+    const x: i32 = @intFromFloat((xx / 2 + 0.5) * cx);
+    const y: i32 = @intFromFloat((yy / 2 + 0.5) * cy);
 
-fn drawPixelToBuffer(x: i32, y: i32, brightness: u8) void {
-    if (x >= 0 and y >= 0 and x < canvas.width and y < canvas.height) {
-        const buffer_index: u32 = (@as(u32, @intCast(y)) * canvas.width + @as(u32, @intCast(x))) * 4;
-        if (buffer_index + 3 < buffer.len) {
-            logInt(@intCast(buffer_index));
-            buffer[buffer_index + 0] = brightness; // Red
-            buffer[buffer_index + 1] = brightness; // Green
-            buffer[buffer_index + 2] = brightness; // Blue
-            // buffer[buffer_index + 3] = pixel.v; // Alpha
-            buffer[buffer_index + 3] = 128; // Alpha
+    if (x >= 0 and y >= 0 and x < app.canvas.width and y < app.canvas.height) {
+        const buffer_index: u32 = (@as(u32, @intCast(y)) * app.canvas.width + @as(u32, @intCast(x))) * 4;
+        if (buffer_index + 3 < app.buffer.len) {
+            app.buffer[buffer_index + 0] = brightness;
+            app.buffer[buffer_index + 1] = brightness;
+            app.buffer[buffer_index + 2] = brightness;
+            app.buffer[buffer_index + 3] = 255;
         }
     }
 }
 
-export fn go(timeSinceStart: f32) *[]const u8 {
+export fn go(timeSinceStart: f32) [*]const u8 {
     if (timeSinceStart > 8000) {
-        return undefined;
+        // You might want to add some behavior here
     }
-    a1.process(&p1);
-    drawPixelToBuffer(p1.pos.x, p1.pos.y, 128);
-    // logInt(p1.pos.x);
-    // logInt(p1.pos.y);
-    return &buffer;
+
+    if (app.forces.items.len > 0 and app.points.items.len > 0) {
+        app.forces.items[0].process(&app.points.items[0]);
+    }
+
+    for (app.points.items) |point| {
+        drawPointToBuffer(point.x, point.y, 255);
+    }
+
+    for (app.forces.items) |force| {
+        drawPointToBuffer(force.x, force.y, 0);
+    }
+
+    return app.buffer.ptr;
 }
 
-// fn getRandomPixel() [4]u8 {
-//     return [4]u8{
-//         rng.random().uintAtMost(u8, 255),
-//         rng.random().uintAtMost(u8, 255),
-//         rng.random().uintAtMost(u8, 255),
-//         255,
-//     };
-// }
-
-// fn createBlurryPoint() !Sprite {
-//     const center_x = rng.random().uintAtMost(u32, canvas.width - 1);
-//     const center_y = rng.random().uintAtMost(u32, canvas.height - 1);
-//     const spread = 128; // define the blur spread radius
-
-//     // Allocate memory for pixels
-//     const max_pixels = (spread * 2 + 1) * (spread * 2 + 1);
-//     var allocator = std.heap.page_allocator;
-//     var pixels = try allocator.alloc(Pixel, max_pixels);
-
-//     var i: usize = 0;
-//     var dy: i32 = -spread;
-//     while (dy <= spread) : (dy += 1) {
-//         var dx: i32 = -spread;
-//         while (dx <= spread) : (dx += 1) {
-//             // calculate distance from center
-//             const distance: f32 = @sqrt(@as(f32, @floatFromInt(dx * dx + dy * dy)));
-//             const max_distance = spread;
-//             const brightness = (1.0 - distance / max_distance) * 255;
-
-//             pixels[i] = Pixel{
-//                 .x = dx,
-//                 .y = dy,
-//                 .v = @intFromFloat(brightness),
-//             };
-//             i += 1;
-//         }
-//     }
-
-//     return Sprite{
-//         .x = @intCast(center_x),
-//         .y = @intCast(center_y),
-//         .p = pixels[0..i],
-//     };
-// }
-
-// fn spriteToBuffer(s: Sprite) void {
-//     for (s.p) |pixel| {
-//         const x = pixel.x + s.x;
-//         const y = pixel.y + s.y;
-//         drawPixelToBuffer(x, y, pixel.v);
-//     }
-// }
-
-// fn freeSprite(sprite: Sprite) void {
-//     std.heap.page_allocator.free(sprite.p);
-// }
-
-// fn drawRandomCircles() void {
-//     const numOfCircles = 8;
-//     const maxRadius = 160;
-
-//     var index: u32 = 0;
-
-//     while (index < numOfCircles) {
-//         const posx = rng.random().uintAtMost(u32, canvas.width);
-//         const posy = rng.random().uintAtMost(u32, canvas.height);
-//         const r = rng.random().uintAtMost(u8, maxRadius);
-//         drawCircle(@intCast(posx), @intCast(posy), r);
-//         index += 1;
-//     }
-// }
-
-// fn drawCircle(cx: i32, cy: i32, radius: i32) void {
-//     var x: i32 = radius;
-//     var y: i32 = 0;
-//     var decision_over2: i32 = 1 - x; // Decision criterion divided by 2 evaluated at (radius, 0)
-
-//     while (x >= y) {
-//         // Drawing all the points in all octants of the circle
-//         drawPixelToBuffer(cx + x, cy + y, 255);
-//         drawPixelToBuffer(cx + y, cy + x, 255);
-//         drawPixelToBuffer(cx - y, cy + x, 255);
-//         drawPixelToBuffer(cx - x, cy + y, 255);
-//         drawPixelToBuffer(cx - x, cy - y, 255);
-//         drawPixelToBuffer(cx - y, cy - x, 255);
-//         drawPixelToBuffer(cx + y, cy - x, 255);
-//         drawPixelToBuffer(cx + x, cy - y, 255);
-
-//         y += 1;
-//         if (decision_over2 <= 0) {
-//             decision_over2 += 2 * y + 1; // Change in decision criterion for y -> y+1
-//         } else {
-//             x -= 1;
-//             decision_over2 += 2 * (y - x) + 1; // Change for y -> y+1 and x -> x-1
-//         }
-//     }
-//     if (radius > 8) {
-//         drawCircle(cx, cy, radius - 1);
-//     }
-// }
+export fn deinit() void {
+    app.deinit();
+}
