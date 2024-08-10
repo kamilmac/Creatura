@@ -15,13 +15,14 @@ const Point = struct {
 const AttractorForce = struct {
     x: f32,
     y: f32,
-    radius: f32 = 1.0,
+    radius: f32,
     points: []Point,
 
     pub fn init(x: f32, y: f32, points: []Point) AttractorForce {
         return .{
             .x = x,
             .y = y,
+            .radius = 1.0,
             .points = points,
         };
     }
@@ -39,15 +40,44 @@ const AttractorForce = struct {
     }
 };
 
+const WindForce = struct {
+    strength: f32,
+    points: []Point,
+
+    pub fn init(strength: f32, points: []Point) WindForce {
+        return .{
+            .strength = strength,
+            .points = points,
+        };
+    }
+
+    pub fn process(self: *WindForce) void {
+        for (self.points) |*point| {
+            point.x += self.strength;
+        }
+    }
+};
+
+const Force = union(enum) {
+    Attractor: AttractorForce,
+    Wind: WindForce,
+
+    pub fn process(self: *Force) void {
+        switch (self.*) {
+            inline else => |*force| force.process(),
+        }
+    }
+};
+
 const App = struct {
     points: []Point,
-    forces: []AttractorForce,
+    forces: []Force,
     buffer: []u8,
     canvas: Canvas,
 
     pub fn init(allocator: std.mem.Allocator, width: u32, height: u32, num_points: usize, num_forces: usize) !App {
         const points = try allocator.alloc(Point, num_points);
-        const forces = try allocator.alloc(AttractorForce, num_forces);
+        const forces = try allocator.alloc(Force, num_forces);
         const buffer = try allocator.alloc(u8, width * height * 4);
 
         return App{
@@ -95,13 +125,14 @@ var app: App = undefined;
 
 export fn init(width: u32, height: u32) void {
     const allocator = std.heap.page_allocator;
-    app = App.init(allocator, width, height, 1, 3) catch unreachable;
-
-    app.forces[0] = AttractorForce.init(0.6, 0.6, app.points[0..]);
-    app.forces[1] = AttractorForce.init(0.0, 0.6, app.points[0..]);
-    app.forces[2] = AttractorForce.init(0.6, -0.6, app.points[0..]);
+    app = App.init(allocator, width, height, 128, 4) catch unreachable;
 
     app.points[0] = .{ .x = 0.0, .y = 0.0 };
+
+    app.forces[0] = Force{ .Attractor = AttractorForce.init(0.6, 0.6, app.points[0..]) };
+    app.forces[1] = Force{ .Attractor = AttractorForce.init(0.0, 0.6, app.points[0..]) };
+    app.forces[2] = Force{ .Attractor = AttractorForce.init(0.6, -0.6, app.points[0..]) };
+    app.forces[3] = Force{ .Wind = WindForce.init(0.01, app.points[0..]) };
 
     app.clearBuffer();
 }
@@ -117,7 +148,10 @@ export fn go(timeSinceStart: f32) [*]const u8 {
 
     for (app.forces) |*force| {
         force.process();
-        app.drawPointToBuffer(force.x, force.y, 0);
+        switch (force.*) {
+            .Attractor => |attractor| app.drawPointToBuffer(attractor.x, attractor.y, 0),
+            .Wind => {}, // Wind forces are not drawn
+        }
     }
 
     return app.buffer.ptr;
