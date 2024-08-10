@@ -110,6 +110,20 @@ const App = struct {
         return &self.points[index];
     }
 
+    pub fn createAttractor(self: *App, origin: *Point, points: []Point) *Force {
+        const index = self.force_count;
+        self.forces[index] = Force{ .Attractor = AttractorForce.init(origin, points) };
+        self.force_count += 1;
+        return &self.forces[index];
+    }
+
+    pub fn createWind(self: *App, strength: f32, points: []Point) *Force {
+        const index = self.force_count;
+        self.forces[index] = Force{ .Wind = WindForce.init(strength, points) };
+        self.force_count += 1;
+        return &self.forces[index];
+    }
+
     pub fn deinit(self: *App) void {
         // self.allocator.free(self.points);
         // self.allocator.free(self.forces);
@@ -149,12 +163,12 @@ export fn init(width: u32, height: u32) void {
 
     _ = app.addPoint(0.0, 0.0);
 
-    app.forces[0] = Force{ .Attractor = AttractorForce.init(app.addPoint(0.6, 0.6), app.points[0..1]) };
-    app.forces[1] = Force{ .Attractor = AttractorForce.init(app.addPoint(0.0, 0.6), app.points[0..1]) };
-    app.forces[2] = Force{ .Attractor = AttractorForce.init(app.addPoint(0.6, -0.6), app.points[0..1]) };
+    _ = app.createAttractor(app.addPoint(0.6, 0.6), app.points[0..1]);
+    _ = app.createAttractor(app.addPoint(0.0, 0.6), app.points[0..1]);
+    _ = app.createAttractor(app.addPoint(0.6, -0.6), app.points[0..1]);
 
-    app.forces[3] = Force{ .Wind = WindForce.init(0.001, app.points[1..2]) };
-    app.force_count = 4;
+    _ = app.createWind(0.001, app.points[1..2]);
+
     app.clearBuffer();
 }
 
