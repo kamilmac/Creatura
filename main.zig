@@ -13,15 +13,13 @@ const Point = struct {
 };
 
 const AttractorForce = struct {
-    x: f32,
-    y: f32,
+    origin: *Point,
     radius: f32,
     points: []Point,
 
-    pub fn init(x: f32, y: f32, points: []Point) AttractorForce {
+    pub fn init(origin: *Point, points: []Point) AttractorForce {
         return .{
-            .x = x,
-            .y = y,
+            .origin = origin,
             .radius = 1.0,
             .points = points,
         };
@@ -29,8 +27,8 @@ const AttractorForce = struct {
 
     pub fn process(self: *AttractorForce) void {
         for (self.points) |*point| {
-            const dx = self.x - point.x;
-            const dy = self.y - point.y;
+            const dx = self.origin.x - point.x;
+            const dy = self.origin.y - point.y;
             const distanceSquared = dx * dx + dy * dy;
             if (distanceSquared <= self.radius * self.radius) {
                 point.x += dx / 40;
@@ -128,11 +126,13 @@ export fn init(width: u32, height: u32) void {
     app = App.init(allocator, width, height, 128, 4) catch unreachable;
 
     app.points[0] = .{ .x = 0.0, .y = 0.0 };
-
-    app.forces[0] = Force{ .Attractor = AttractorForce.init(0.6, 0.6, app.points[0..]) };
-    app.forces[1] = Force{ .Attractor = AttractorForce.init(0.0, 0.6, app.points[0..]) };
-    app.forces[2] = Force{ .Attractor = AttractorForce.init(0.6, -0.6, app.points[0..]) };
-    app.forces[3] = Force{ .Wind = WindForce.init(0.01, app.points[0..]) };
+    app.points[1] = .{ .x = 0.6, .y = 0.6 };
+    app.points[2] = .{ .x = 0.0, .y = 0.6 };
+    app.points[3] = .{ .x = 0.6, .y = -0.6 };
+    app.forces[0] = Force{ .Attractor = AttractorForce.init(&app.points[1], app.points[0..1]) };
+    app.forces[1] = Force{ .Attractor = AttractorForce.init(&app.points[2], app.points[0..1]) };
+    app.forces[2] = Force{ .Attractor = AttractorForce.init(&app.points[3], app.points[0..1]) };
+    app.forces[3] = Force{ .Wind = WindForce.init(0.001, app.points[1..2]) };
 
     app.clearBuffer();
 }
@@ -149,7 +149,7 @@ export fn go(timeSinceStart: f32) [*]const u8 {
     for (app.forces) |*force| {
         force.process();
         switch (force.*) {
-            .Attractor => |attractor| app.drawPointToBuffer(attractor.x, attractor.y, 0),
+            .Attractor => |attractor| app.drawPointToBuffer(attractor.origin.x, attractor.origin.y, 0),
             .Wind => {}, // Wind forces are not drawn
         }
     }
