@@ -72,11 +72,45 @@ const WindForce = struct {
 const Force = union(enum) {
     Attractor: AttractorForce,
     Wind: WindForce,
+    Random: RandomForce,
 
     pub fn process(self: *Force) void {
         switch (self.*) {
             inline else => |*force| force.process(),
         }
+    }
+};
+
+const RandomForce = struct {
+    strength: f32,
+    points: []Point,
+    target: Point,
+    t: f32,
+
+    pub fn init(strength: f32, points: []Point) RandomForce {
+        return .{
+            .strength = strength,
+            .points = points,
+            .target = Point.init(0, 0),
+            .t = 1.0, // Start at 1.0 to generate a new target immediately
+        };
+    }
+
+    pub fn process(self: *RandomForce) void {
+        if (self.t >= 1.0) {
+            // Generate new random target
+            self.target.x = rng.random().float(f32) * 2 - 1; // Range: -1 to 1
+            self.target.y = rng.random().float(f32) * 2 - 1; // Range: -1 to 1
+            self.t = 0.0;
+        }
+
+        for (self.points) |*point| {
+            // Linear interpolation (lerp)
+            point.x += (self.target.x - point.x) * self.strength * self.t;
+            point.y += (self.target.y - point.y) * self.strength * self.t;
+        }
+
+        self.t += 0.01; // Increase t for smooth transition
     }
 };
 
@@ -102,7 +136,7 @@ const App = struct {
         };
     }
 
-    pub fn addPoint(self: *App, x: f32, y: f32) *Point {
+    pub fn createPoint(self: *App, x: f32, y: f32) *Point {
         // if (self.point_count >= MAX_POINTS) return error.TooManyPoints;
         const index = self.point_count;
         self.points[index] = Point.init(x, y);
@@ -124,9 +158,14 @@ const App = struct {
         return &self.forces[index];
     }
 
+    pub fn createRandom(self: *App, strength: f32, points: []Point) *Force {
+        const index = self.force_count;
+        self.forces[index] = Force{ .Random = RandomForce.init(strength, points) };
+        self.force_count += 1;
+        return &self.forces[index];
+    }
+
     pub fn deinit(self: *App) void {
-        // self.allocator.free(self.points);
-        // self.allocator.free(self.forces);
         self.allocator.free(self.buffer);
     }
 
@@ -161,13 +200,17 @@ export fn init(width: u32, height: u32) void {
     app = App.init(allocator, width, height) catch unreachable;
     defer app.deinit();
 
-    _ = app.addPoint(0.0, 0.0);
+    _ = app.createPoint(0.0, 0.0);
 
-    _ = app.createAttractor(app.addPoint(0.6, 0.6), app.points[0..1]);
-    _ = app.createAttractor(app.addPoint(0.0, 0.6), app.points[0..1]);
-    _ = app.createAttractor(app.addPoint(0.6, -0.6), app.points[0..1]);
+    const p1 = app.createPoint(0.6, 0.6);
+    const p2 = app.createPoint(0.0, 0.6);
+    const p3 = app.createPoint(0.6, -0.6);
 
-    _ = app.createWind(0.001, app.points[1..2]);
+    _ = app.createAttractor(p1, app.points[0..1]);
+    _ = app.createAttractor(p2, app.points[0..1]);
+    _ = app.createAttractor(p3, app.points[0..1]);
+
+    _ = app.createRandom(0.001, app.points[1..4]);
 
     app.clearBuffer();
 }
@@ -182,6 +225,7 @@ export fn go() [*]const u8 {
         switch (force) {
             .Attractor => |attractor| app.drawPointToBuffer(attractor.origin.x, attractor.origin.y, 0),
             .Wind => {}, // Wind forces are not drawn
+            .Random => {}, // Wind forces are not drawn
         }
     }
 
