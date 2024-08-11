@@ -5,7 +5,7 @@ extern "env" fn js_console_log(ptr: [*]const u8, len: usize) void;
 const MAX_POINTS = 1024;
 const MAX_FORCES = 512;
 
-var rng = std.rand.DefaultPrng.init(0);
+var rng = std.rand.DefaultPrng.init(8);
 var app: App = undefined;
 
 const Canvas = struct {
@@ -16,11 +16,13 @@ const Canvas = struct {
 const Point = struct {
     x: f32,
     y: f32,
+    id: u32 = 0,
 
-    pub fn init(x: f32, y: f32) Point {
+    pub fn init(x: f32, y: f32, id: ?u32) Point {
         return .{
             .x = x,
             .y = y,
+            .id = id orelse 0,
         };
     }
 };
@@ -28,75 +30,58 @@ const Point = struct {
 const AttractorForce = struct {
     origin: *Point,
     radius: f32,
-    points: []Point,
+    pid: u32,
 
-    pub fn init(origin: *Point, points: []Point) AttractorForce {
+    pub fn init(origin: *Point, pid: u32) AttractorForce {
         return .{
             .origin = origin,
             .radius = 1.0,
-            .points = points,
+            .pid = pid,
         };
     }
 
-    pub fn process(self: *AttractorForce) void {
-        for (self.points) |*point| {
-            const dx = self.origin.x - point.x;
-            const dy = self.origin.y - point.y;
-            const distanceSquared = dx * dx + dy * dy;
-            if (distanceSquared <= self.radius * self.radius) {
-                point.x += dx / 40;
-                point.y += dy / 40;
+    pub fn process(self: *AttractorForce, points: []Point) void {
+        for (points) |*point| {
+            if (point.id == self.pid) {
+                const dx = self.origin.x - point.x;
+                const dy = self.origin.y - point.y;
+                const distanceSquared = dx * dx + dy * dy;
+                if (distanceSquared <= self.radius * self.radius) {
+                    point.x += dx / 40;
+                    point.y += dy / 40;
+                }
             }
-        }
-    }
-};
-
-const WindForce = struct {
-    strength: f32,
-    points: []Point,
-
-    pub fn init(strength: f32, points: []Point) WindForce {
-        return .{
-            .strength = strength,
-            .points = points,
-        };
-    }
-
-    pub fn process(self: *WindForce) void {
-        for (self.points) |*point| {
-            point.x += self.strength;
         }
     }
 };
 
 const Force = union(enum) {
     Attractor: AttractorForce,
-    Wind: WindForce,
     Random: RandomForce,
 
-    pub fn process(self: *Force) void {
+    pub fn process(self: *Force, points: []Point) void {
         switch (self.*) {
-            inline else => |*force| force.process(),
+            inline else => |*force| force.process(points),
         }
     }
 };
 
 const RandomForce = struct {
     strength: f32,
-    points: []Point,
+    pid: u32,
     target: Point,
     t: f32,
 
-    pub fn init(strength: f32, points: []Point) RandomForce {
+    pub fn init(strength: f32, pid: u32) RandomForce {
         return .{
+            .pid = pid,
             .strength = strength,
-            .points = points,
-            .target = Point.init(0, 0),
+            .target = Point.init(0, 0, null),
             .t = 1.0, // Start at 1.0 to generate a new target immediately
         };
     }
 
-    pub fn process(self: *RandomForce) void {
+    pub fn process(self: *RandomForce, points: []Point) void {
         if (self.t >= 1.0) {
             // Generate new random target
             self.target.x = rng.random().float(f32) * 2 - 1; // Range: -1 to 1
@@ -104,10 +89,12 @@ const RandomForce = struct {
             self.t = 0.0;
         }
 
-        for (self.points) |*point| {
-            // Linear interpolation (lerp)
-            point.x += (self.target.x - point.x) * self.strength * self.t;
-            point.y += (self.target.y - point.y) * self.strength * self.t;
+        for (points) |*point| {
+            if (point.id == self.pid) {
+                // Linear interpolation (lerp)
+                point.x += (self.target.x - point.x) * self.strength * self.t;
+                point.y += (self.target.y - point.y) * self.strength * self.t;
+            }
         }
 
         self.t += 0.01; // Increase t for smooth transition
@@ -136,31 +123,24 @@ const App = struct {
         };
     }
 
-    pub fn createPoint(self: *App, x: f32, y: f32) *Point {
+    pub fn createPoint(self: *App, x: f32, y: f32, id: u32) *Point {
         // if (self.point_count >= MAX_POINTS) return error.TooManyPoints;
         const index = self.point_count;
-        self.points[index] = Point.init(x, y);
+        self.points[index] = Point.init(x, y, id);
         self.point_count += 1;
         return &self.points[index];
     }
 
-    pub fn createAttractor(self: *App, origin: *Point, points: []Point) *Force {
+    pub fn createAttractor(self: *App, origin: *Point, pid: u32) *Force {
         const index = self.force_count;
-        self.forces[index] = Force{ .Attractor = AttractorForce.init(origin, points) };
+        self.forces[index] = Force{ .Attractor = AttractorForce.init(origin, pid) };
         self.force_count += 1;
         return &self.forces[index];
     }
 
-    pub fn createWind(self: *App, strength: f32, points: []Point) *Force {
+    pub fn createRandom(self: *App, strength: f32, pid: u32) *Force {
         const index = self.force_count;
-        self.forces[index] = Force{ .Wind = WindForce.init(strength, points) };
-        self.force_count += 1;
-        return &self.forces[index];
-    }
-
-    pub fn createRandom(self: *App, strength: f32, points: []Point) *Force {
-        const index = self.force_count;
-        self.forces[index] = Force{ .Random = RandomForce.init(strength, points) };
+        self.forces[index] = Force{ .Random = RandomForce.init(strength, pid) };
         self.force_count += 1;
         return &self.forces[index];
     }
@@ -200,17 +180,16 @@ export fn init(width: u32, height: u32) void {
     app = App.init(allocator, width, height) catch unreachable;
     defer app.deinit();
 
-    _ = app.createPoint(0.0, 0.0);
+    _ = app.createPoint(0.0, 0.0, 1);
 
-    const p1 = app.createPoint(0.6, 0.6);
-    const p2 = app.createPoint(0.0, 0.6);
-    const p3 = app.createPoint(0.6, -0.6);
+    const p1 = app.createPoint(0.6, 0.6, 2);
+    const p2 = app.createPoint(0.0, 0.6, 2);
+    const p3 = app.createPoint(0.6, -0.6, 2);
 
-    _ = app.createAttractor(p1, app.points[0..1]);
-    _ = app.createAttractor(p2, app.points[0..1]);
-    _ = app.createAttractor(p3, app.points[0..1]);
-
-    _ = app.createRandom(0.001, app.points[1..4]);
+    _ = app.createAttractor(p1, 1);
+    _ = app.createAttractor(p2, 1);
+    _ = app.createAttractor(p3, 1);
+    _ = app.createRandom(0.001, 2);
 
     app.clearBuffer();
 }
@@ -221,11 +200,10 @@ export fn go() [*]const u8 {
     }
 
     for (app.forces[0..app.force_count], 0..) |force, i| {
-        app.forces[i].process();
+        app.forces[i].process(app.points[0..]);
         switch (force) {
             .Attractor => |attractor| app.drawPointToBuffer(attractor.origin.x, attractor.origin.y, 0),
-            .Wind => {}, // Wind forces are not drawn
-            .Random => {}, // Wind forces are not drawn
+            .Random => {},
         }
     }
 
