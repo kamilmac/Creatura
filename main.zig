@@ -104,7 +104,8 @@ export fn init(width: u32, height: u32) void {
     _ = app.createForceAttractor(p1, 1);
     _ = app.createForceAttractor(p2, 1);
     _ = app.createForceAttractor(p3, 1);
-    _ = app.createForceSmoothRandom(0.001, 2);
+    _ = app.createForceSmoothRandom(0.04, 2);
+    // _ = app.createForceSmoothRandom(0.8, 2);
 
     app.clearBuffer();
 }
