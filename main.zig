@@ -7,6 +7,8 @@ pub const Color = enum(u32) {
     Green = 0x00FF00FF,
     Blue = 0x0000FFFF,
     Yellow = 0xFFFF00FF,
+    Black = 0x000000FF,
+    White = 0xFFFFFFFF,
     // Add more colors as needed
 
     pub fn toRGBA(self: Color) [4]u8 {
@@ -143,6 +145,56 @@ pub const Canvas = struct {
         }
     }
 
+    pub fn drawLine(self: *Canvas, start: Point, end: Point, stroke_width: f32, color: Color) void {
+        const start_screen = self.translateToScreenSpace(start.position[0], start.position[1]);
+        const end_screen = self.translateToScreenSpace(end.position[0], end.position[1]);
+        const half_width: i32 = @intFromFloat(stroke_width * @as(f32, @floatFromInt(self.width)) * 0.25);
+
+        var x0 = start_screen.x;
+        var y0 = start_screen.y;
+        const dx: i32 = @intCast(@abs(end_screen.x - x0));
+        const dy: i32 = @intCast(@abs(end_screen.y - y0));
+        const sx: i32 = if (x0 < end_screen.x) 1 else -1;
+        const sy: i32 = if (y0 < end_screen.y) 1 else -1;
+        var err = dx - dy;
+
+        while (true) {
+            // Draw a filled rectangle centered on the current pixel
+            self.fillRect(x0 - half_width, y0 - half_width, x0 + half_width, y0 + half_width, color);
+
+            if (x0 == end_screen.x and y0 == end_screen.y) break;
+            const e2 = 2 * err;
+            if (e2 > -dy) {
+                err -= dy;
+                x0 += sx;
+            }
+            if (e2 < dx) {
+                err += dx;
+                y0 += sy;
+            }
+        }
+    }
+
+    fn fillRect(self: *Canvas, x1: i32, y1: i32, x2: i32, y2: i32, color: Color) void {
+        const start_x = @max(0, @min(x1, x2));
+        const end_x = @min(@as(i32, @intCast(self.width)) - 1, @max(x1, x2));
+        const start_y = @max(0, @min(y1, y2));
+        const end_y = @min(@as(i32, @intCast(self.height)) - 1, @max(y1, y2));
+
+        const rgba = color.toRGBA();
+        var y = start_y;
+        while (y <= end_y) : (y += 1) {
+            var x = start_x;
+            while (x <= end_x) : (x += 1) {
+                const index = (@as(usize, @intCast(y)) * self.width + @as(usize, @intCast(x))) * 4;
+                self.buffer[index] = rgba[0];
+                self.buffer[index + 1] = rgba[1];
+                self.buffer[index + 2] = rgba[2];
+                self.buffer[index + 3] = rgba[3];
+            }
+        }
+    }
+
     fn setPixel(self: *Canvas, x: i32, y: i32, color: Color) void {
         if (x < 0 or x >= @as(i32, @intCast(self.width)) or y < 0 or y >= @as(i32, @intCast(self.height))) {
             return;
@@ -186,19 +238,19 @@ export fn init(width: usize, height: usize) void {
     const allocator = gpa.allocator();
 
     rasterizer = Canvas.init(allocator, width, height) catch unreachable;
-    rasterizer.setClearColor(.Blue);
+    rasterizer.setClearColor(.White);
 
     _ = points[0]
         .setPosition(0.9, -0.9)
-        .setColor(.Green)
+        .setColor(.Black)
         .setVelocity(-0.008, 0.004);
     _ = points[1]
         .setPosition(0.0, 0.0)
-        .followPoint(&points[0])
+        .setColor(.Black)
         .followPoint(&points[2]);
     _ = points[2]
         .setPosition(-0.5, 0.8)
-        .setColor(.Yellow)
+        .setColor(.Black)
         .setVelocity(0.004, -0.004);
 }
 
@@ -207,9 +259,11 @@ export fn go() [*]const u8 {
 
     for (&points) |*point| {
         _ = point.update();
-        rasterizer.paintCircle(point.*, 0.2, 0.05);
+        rasterizer.paintCircle(point.*, 0.1, 0.01);
     }
-
+    rasterizer.drawLine(points[0], points[1], 0.004, points[0].color);
+    rasterizer.drawLine(points[1], points[2], 0.004, points[0].color);
+    rasterizer.drawLine(points[2], points[0], 0.004, points[0].color);
     return rasterizer.getBufferPtr();
 }
 
