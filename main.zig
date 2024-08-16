@@ -48,8 +48,8 @@ pub const Point = struct {
         self.y += self.velocity_y;
 
         // Simple damping
-        self.velocity_x *= 0.99;
-        self.velocity_y *= 0.99;
+        self.velocity_x *= 0.994;
+        self.velocity_y *= 0.994;
 
         // Basic boundary check
         self.x = math.clamp(self.x, -1.0, 1.0);
@@ -89,28 +89,36 @@ pub const Rasterizer = struct {
         }
     }
 
-    pub fn paintCircle(self: *Rasterizer, center: Point, radius: f32) void {
-        const x0: i32 = @intFromFloat((center.x + 1) * 0.5 * @as(f32, @floatFromInt(self.width)));
-        const y0: i32 = @intFromFloat((1 - center.y) * 0.5 * @as(f32, @floatFromInt(self.height)));
-        const r: i32 = @intFromFloat(radius * @as(f32, @floatFromInt(self.width)) * 0.5);
+    fn translateToScreenSpace(self: *const Rasterizer, x: f32, y: f32) struct { x: i32, y: i32 } {
+        return .{
+            .x = @intFromFloat((x + 1) * 0.5 * @as(f32, @floatFromInt(self.width))),
+            .y = @intFromFloat((1 - y) * 0.5 * @as(f32, @floatFromInt(self.height))),
+        };
+    }
 
-        var x: i32 = -r;
-        var y: i32 = 0;
-        var err: i32 = 2 - 2 * r;
+    pub fn paintCircle(self: *Rasterizer, center: Point, radius: f32, stroke_width: f32) void {
+        const screen_position = self.translateToScreenSpace(center.x, center.y);
+        const x0 = screen_position.x;
+        const y0 = screen_position.y;
+        const r = radius * @as(f32, @floatFromInt(self.width)) * 0.5;
+        const stroke = stroke_width * @as(f32, @floatFromInt(self.width)) * 0.5;
+        const outer_radius_sq = (r + stroke * 0.5) * (r + stroke * 0.5);
+        const inner_radius_sq = (r - stroke * 0.5) * (r - stroke * 0.5);
 
-        while (x < 0) : ({
-            err = if (r <= y) blk: {
-                y += 1;
-                break :blk err + y * 2 + 1;
-            } else if (r > x or err > y) blk: {
-                x += 1;
-                break :blk err + x * 2 + 1;
-            } else err;
-        }) {
-            self.setPixel(x0 - x, y0 + y);
-            self.setPixel(x0 - y, y0 - x);
-            self.setPixel(x0 + x, y0 - y);
-            self.setPixel(x0 + y, y0 + x);
+        const bounding_box: i32 = @intFromFloat(r + stroke * 0.5 + 1);
+
+        var y: i32 = -bounding_box;
+        while (y <= bounding_box) : (y += 1) {
+            var x: i32 = -bounding_box;
+            while (x <= bounding_box) : (x += 1) {
+                const dx: f32 = @floatFromInt(x);
+                const dy: f32 = @floatFromInt(y);
+                const distance_sq = dx * dx + dy * dy;
+
+                if (distance_sq <= outer_radius_sq and distance_sq >= inner_radius_sq) {
+                    self.setPixel(x0 + x, y0 + y);
+                }
+            }
         }
     }
 
@@ -146,10 +154,10 @@ export fn init(width: usize, height: usize) void {
     rasterizer = Rasterizer.init(allocator, width, height) catch unreachable;
 
     _ = points[0]
-        .setPosition(0.0, 0.0)
-        .setVelocity(0.001, 0.0015);
+        .setPosition(0.9, -0.9)
+        .setVelocity(-0.008, 0.004);
     _ = points[1]
-        .setPosition(0.2, 0.2)
+        .setPosition(0.0, 0.0)
         .followPoint(&points[0]);
 }
 
@@ -158,7 +166,7 @@ export fn go() [*]const u8 {
 
     for (&points) |*point| {
         _ = point.update();
-        rasterizer.paintCircle(point.*, 5);
+        rasterizer.paintCircle(point.*, 0.2, 0.05);
     }
 
     return rasterizer.getBufferPtr();
