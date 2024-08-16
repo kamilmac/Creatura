@@ -83,6 +83,7 @@ pub const Canvas = struct {
     height: usize,
     buffer: []u8,
     allocator: Allocator,
+    clear_pattern: [32]u8,
 
     pub fn init(allocator: Allocator, width: usize, height: usize) !Canvas {
         const buffer = try allocator.alloc(u8, width * height * 4);
@@ -91,6 +92,7 @@ pub const Canvas = struct {
             .height = height,
             .buffer = buffer,
             .allocator = allocator,
+            .clear_pattern = undefined,
         };
     }
 
@@ -100,11 +102,11 @@ pub const Canvas = struct {
 
     pub fn clear(self: *Canvas) void {
         var i: usize = 0;
-        while (i < self.buffer.len) : (i += 4) {
-            self.buffer[i] = 173; // R
-            self.buffer[i + 1] = 216; // G
-            self.buffer[i + 2] = 230; // B
-            self.buffer[i + 3] = 255; // A
+        while (i + 32 <= self.buffer.len) : (i += 32) {
+            @memcpy(self.buffer[i .. i + 32], &self.clear_pattern);
+        }
+        if (i < self.buffer.len) {
+            @memcpy(self.buffer[i..], self.clear_pattern[0 .. self.buffer.len - i]);
         }
     }
 
@@ -154,6 +156,17 @@ pub const Canvas = struct {
         self.buffer[index + 3] = rgba[3]; // A
     }
 
+    pub fn setClearColor(self: *Canvas, color: Color) void {
+        const rgba = color.toRGBA();
+        var i: usize = 0;
+        while (i < self.clear_pattern.len) : (i += 4) {
+            self.clear_pattern[i] = rgba[0];
+            self.clear_pattern[i + 1] = rgba[1];
+            self.clear_pattern[i + 2] = rgba[2];
+            self.clear_pattern[i + 3] = rgba[3];
+        }
+    }
+
     pub fn getBufferPtr(self: *Canvas) [*]u8 {
         return self.buffer.ptr;
     }
@@ -164,6 +177,7 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 var points = [_]Point{
     Point.init(),
     Point.init(),
+    Point.init(),
 };
 
 var rasterizer: Canvas = undefined;
@@ -172,6 +186,7 @@ export fn init(width: usize, height: usize) void {
     const allocator = gpa.allocator();
 
     rasterizer = Canvas.init(allocator, width, height) catch unreachable;
+    rasterizer.setClearColor(.Blue);
 
     _ = points[0]
         .setPosition(0.9, -0.9)
@@ -179,7 +194,12 @@ export fn init(width: usize, height: usize) void {
         .setVelocity(-0.008, 0.004);
     _ = points[1]
         .setPosition(0.0, 0.0)
-        .followPoint(&points[0]);
+        .followPoint(&points[0])
+        .followPoint(&points[2]);
+    _ = points[2]
+        .setPosition(-0.5, 0.8)
+        .setColor(.Yellow)
+        .setVelocity(0.004, -0.004);
 }
 
 export fn go() [*]const u8 {
