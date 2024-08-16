@@ -2,32 +2,46 @@ const std = @import("std");
 const math = std.math;
 const Allocator = std.mem.Allocator;
 
+pub const Color = enum(u32) {
+    Red = 0xFF0000FF,
+    Green = 0x00FF00FF,
+    Blue = 0x0000FFFF,
+    Yellow = 0xFFFF00FF,
+    // Add more colors as needed
+
+    pub fn toRGBA(self: Color) [4]u8 {
+        const value = @intFromEnum(self);
+        return .{
+            @intCast((value >> 24) & 0xFF),
+            @intCast((value >> 16) & 0xFF),
+            @intCast((value >> 8) & 0xFF),
+            @intCast(value & 0xFF),
+        };
+    }
+};
+
 pub const Point = struct {
-    x: f32,
-    y: f32,
-    velocity_x: f32,
-    velocity_y: f32,
+    position: [2]f32,
+    velocity: [2]f32,
     target: ?*Point,
+    color: Color,
 
     pub fn init() Point {
         return .{
-            .x = 0,
-            .y = 0,
-            .velocity_x = 0,
-            .velocity_y = 0,
+            .position = .{ 0, 0 },
+            .velocity = .{ 0, 0 },
             .target = null,
+            .color = .Red,
         };
     }
 
     pub fn setPosition(self: *Point, x: f32, y: f32) *Point {
-        self.x = x;
-        self.y = y;
+        self.position = .{ x, y };
         return self;
     }
 
     pub fn setVelocity(self: *Point, vx: f32, vy: f32) *Point {
-        self.velocity_x = vx;
-        self.velocity_y = vy;
+        self.velocity = .{ vx, vy };
         return self;
     }
 
@@ -36,38 +50,43 @@ pub const Point = struct {
         return self;
     }
 
+    pub fn setColor(self: *Point, new_color: Color) *Point {
+        self.color = new_color;
+        return self;
+    }
+
     pub fn update(self: *Point) *Point {
         if (self.target) |t| {
-            const dx = t.x - self.x;
-            const dy = t.y - self.y;
-            self.velocity_x += dx * 0.1;
-            self.velocity_y += dy * 0.1;
+            const dx = t.position[0] - self.position[0];
+            const dy = t.position[1] - self.position[1];
+            self.velocity[0] += dx * 0.1;
+            self.velocity[1] += dy * 0.1;
         }
 
-        self.x += self.velocity_x;
-        self.y += self.velocity_y;
+        self.position[0] += self.velocity[0];
+        self.position[1] += self.velocity[1];
 
         // Simple damping
-        self.velocity_x *= 0.994;
-        self.velocity_y *= 0.994;
+        self.velocity[0] *= 0.994;
+        self.velocity[1] *= 0.994;
 
         // Basic boundary check
-        self.x = math.clamp(self.x, -1.0, 1.0);
-        self.y = math.clamp(self.y, -1.0, 1.0);
+        self.position[0] = math.clamp(self.position[0], -1.0, 1.0);
+        self.position[1] = math.clamp(self.position[1], -1.0, 1.0);
 
         return self;
     }
 };
 
-pub const Rasterizer = struct {
+pub const Canvas = struct {
     width: usize,
     height: usize,
     buffer: []u8,
     allocator: Allocator,
 
-    pub fn init(allocator: Allocator, width: usize, height: usize) !Rasterizer {
+    pub fn init(allocator: Allocator, width: usize, height: usize) !Canvas {
         const buffer = try allocator.alloc(u8, width * height * 4);
-        return Rasterizer{
+        return Canvas{
             .width = width,
             .height = height,
             .buffer = buffer,
@@ -75,11 +94,11 @@ pub const Rasterizer = struct {
         };
     }
 
-    pub fn deinit(self: *Rasterizer) void {
+    pub fn deinit(self: *Canvas) void {
         self.allocator.free(self.buffer);
     }
 
-    pub fn clear(self: *Rasterizer) void {
+    pub fn clear(self: *Canvas) void {
         var i: usize = 0;
         while (i < self.buffer.len) : (i += 4) {
             self.buffer[i] = 173; // R
@@ -89,15 +108,15 @@ pub const Rasterizer = struct {
         }
     }
 
-    fn translateToScreenSpace(self: *const Rasterizer, x: f32, y: f32) struct { x: i32, y: i32 } {
+    fn translateToScreenSpace(self: *const Canvas, x: f32, y: f32) struct { x: i32, y: i32 } {
         return .{
             .x = @intFromFloat((x + 1) * 0.5 * @as(f32, @floatFromInt(self.width))),
             .y = @intFromFloat((1 - y) * 0.5 * @as(f32, @floatFromInt(self.height))),
         };
     }
 
-    pub fn paintCircle(self: *Rasterizer, center: Point, radius: f32, stroke_width: f32) void {
-        const screen_position = self.translateToScreenSpace(center.x, center.y);
+    pub fn paintCircle(self: *Canvas, center: Point, radius: f32, stroke_width: f32) void {
+        const screen_position = self.translateToScreenSpace(center.position[0], center.position[1]);
         const x0 = screen_position.x;
         const y0 = screen_position.y;
         const r = radius * @as(f32, @floatFromInt(self.width)) * 0.5;
@@ -116,25 +135,26 @@ pub const Rasterizer = struct {
                 const distance_sq = dx * dx + dy * dy;
 
                 if (distance_sq <= outer_radius_sq and distance_sq >= inner_radius_sq) {
-                    self.setPixel(x0 + x, y0 + y);
+                    self.setPixel(x0 + x, y0 + y, center.color);
                 }
             }
         }
     }
 
-    fn setPixel(self: *Rasterizer, x: i32, y: i32) void {
+    fn setPixel(self: *Canvas, x: i32, y: i32, color: Color) void {
         if (x < 0 or x >= @as(i32, @intCast(self.width)) or y < 0 or y >= @as(i32, @intCast(self.height))) {
             return;
         }
 
         const index = (@as(usize, @intCast(y)) * self.width + @as(usize, @intCast(x))) * 4;
-        self.buffer[index] = 255; // R
-        self.buffer[index + 1] = 0; // G
-        self.buffer[index + 2] = 0; // B
-        self.buffer[index + 3] = 255; // A
+        const rgba = color.toRGBA();
+        self.buffer[index] = rgba[0]; // R
+        self.buffer[index + 1] = rgba[1]; // G
+        self.buffer[index + 2] = rgba[2]; // B
+        self.buffer[index + 3] = rgba[3]; // A
     }
 
-    pub fn getBufferPtr(self: *Rasterizer) [*]u8 {
+    pub fn getBufferPtr(self: *Canvas) [*]u8 {
         return self.buffer.ptr;
     }
 };
@@ -146,15 +166,16 @@ var points = [_]Point{
     Point.init(),
 };
 
-var rasterizer: Rasterizer = undefined;
+var rasterizer: Canvas = undefined;
 
 export fn init(width: usize, height: usize) void {
     const allocator = gpa.allocator();
 
-    rasterizer = Rasterizer.init(allocator, width, height) catch unreachable;
+    rasterizer = Canvas.init(allocator, width, height) catch unreachable;
 
     _ = points[0]
         .setPosition(0.9, -0.9)
+        .setColor(.Green)
         .setVelocity(-0.008, 0.004);
     _ = points[1]
         .setPosition(0.0, 0.0)
