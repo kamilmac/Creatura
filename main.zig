@@ -249,6 +249,57 @@ pub const Canvas = struct {
         }
     }
 
+    pub fn chromaticAberration(self: *Canvas, max_offset_x: i32, max_offset_y: i32) void {
+        const temp_buffer = self.allocator.alloc(u8, self.buffer.len) catch unreachable;
+        defer self.allocator.free(temp_buffer);
+
+        @memcpy(temp_buffer, self.buffer);
+
+        const center_x = @as(f32, @floatFromInt(self.width)) / 2;
+        const center_y = @as(f32, @floatFromInt(self.height)) / 2;
+        const max_distance = @sqrt(center_x * center_x + center_y * center_y);
+
+        var y: usize = 0;
+        while (y < self.height) : (y += 1) {
+            var x: usize = 0;
+            while (x < self.width) : (x += 1) {
+                const dx = @as(f32, @floatFromInt(x)) - center_x;
+                const dy = @as(f32, @floatFromInt(y)) - center_y;
+                const distance = @sqrt(dx * dx + dy * dy);
+                const intensity = distance / max_distance;
+
+                const offset_x = @as(i32, @intFromFloat(@as(f32, @floatFromInt(max_offset_x)) * intensity));
+                const offset_y = @as(i32, @intFromFloat(@as(f32, @floatFromInt(max_offset_y)) * intensity));
+
+                const index = (y * self.width + x) * 4;
+
+                // Red channel
+                const red_x = @as(i32, @intCast(x)) + offset_x;
+                const red_y = @as(i32, @intCast(y)) + offset_y;
+                if (red_x >= 0 and red_x < @as(i32, @intCast(self.width)) and
+                    red_y >= 0 and red_y < @as(i32, @intCast(self.height)))
+                {
+                    const red_index = (@as(usize, @intCast(red_y)) * self.width + @as(usize, @intCast(red_x))) * 4;
+                    self.buffer[index] = temp_buffer[red_index];
+                }
+
+                // Blue channel
+                const blue_x = @as(i32, @intCast(x)) - offset_x;
+                const blue_y = @as(i32, @intCast(y)) - offset_y;
+                if (blue_x >= 0 and blue_x < @as(i32, @intCast(self.width)) and
+                    blue_y >= 0 and blue_y < @as(i32, @intCast(self.height)))
+                {
+                    const blue_index = (@as(usize, @intCast(blue_y)) * self.width + @as(usize, @intCast(blue_x))) * 4 + 2;
+                    self.buffer[index + 2] = temp_buffer[blue_index];
+                }
+
+                // Green channel and alpha remain unchanged
+                self.buffer[index + 1] = temp_buffer[index + 1];
+                self.buffer[index + 3] = temp_buffer[index + 3];
+            }
+        }
+    }
+
     pub fn getBufferPtr(self: *Canvas) [*]u8 {
         return self.buffer.ptr;
     }
@@ -299,6 +350,8 @@ export fn go() [*]const u8 {
     canvas.drawBezierCurve(points[1], points[2], points[3], 0.008, points[0].color);
     canvas.drawBezierCurve(points[2], points[0], points[3], 0.008, points[0].color);
     canvas.drawBezierCurve(points[0], points[1], points[3], 0.008, points[0].color);
+    // canvas.pixelate(@intFromFloat(@abs(points[0].position[0]) * 128));
+    canvas.chromaticAberration(8, 8);
     return canvas.getBufferPtr();
 }
 
