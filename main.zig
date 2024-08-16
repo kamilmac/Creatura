@@ -1,137 +1,163 @@
 const std = @import("std");
+const math = std.math;
+const Allocator = std.mem.Allocator;
 
-const Force = @import("force.zig").Force;
-const AttractorForce = @import("force.zig").AttractorForce;
-const RandomForce = @import("force.zig").RandomForce;
-const Point = @import("point.zig").Point;
+pub const Point = struct {
+    x: f32,
+    y: f32,
+    velocity_x: f32,
+    velocity_y: f32,
+    target: ?*Point,
 
-extern "env" fn js_console_log(ptr: [*]const u8, len: usize) void;
-
-const MAX_POINTS = 1024;
-const MAX_FORCES = 512;
-
-var app: App = undefined;
-
-const Canvas = struct {
-    height: u32,
-    width: u32,
-};
-
-const App = struct {
-    allocator: std.mem.Allocator,
-    points: [MAX_POINTS]Point,
-    forces: [MAX_FORCES]Force,
-    point_count: u16,
-    force_count: u16,
-    buffer: []u8,
-    canvas: Canvas,
-
-    pub fn init(allocator: std.mem.Allocator, width: u32, height: u32) !App {
-        const buffer = try allocator.alloc(u8, width * height * 4);
-        return App{
-            .allocator = allocator,
-            .points = undefined,
-            .forces = undefined,
-            .point_count = 0,
-            .force_count = 0,
-            .buffer = buffer,
-            .canvas = Canvas{ .width = width, .height = height },
+    pub fn init() Point {
+        return .{
+            .x = 0,
+            .y = 0,
+            .velocity_x = 0,
+            .velocity_y = 0,
+            .target = null,
         };
     }
 
-    pub fn createPoint(self: *App, x: f32, y: f32, id: u32) *Point {
-        const index = self.point_count;
-        self.points[index] = Point.init(x, y, id);
-        self.point_count += 1;
-        return &self.points[index];
+    pub fn setPosition(self: *Point, x: f32, y: f32) *Point {
+        self.x = x;
+        self.y = y;
+        return self;
     }
 
-    pub fn createForceAttractor(self: *App, origin: *Point, pid: u32) *Force {
-        const index = self.force_count;
-        self.forces[index] = Force{ .Attractor = AttractorForce.init(origin, pid) };
-        self.force_count += 1;
-        return &self.forces[index];
+    pub fn setVelocity(self: *Point, vx: f32, vy: f32) *Point {
+        self.velocity_x = vx;
+        self.velocity_y = vy;
+        return self;
     }
 
-    pub fn createForceSmoothRandom(self: *App, strength: f32, pid: u32) *Force {
-        const index = self.force_count;
-        self.forces[index] = Force{ .Random = RandomForce.init(strength, pid) };
-        self.force_count += 1;
-        return &self.forces[index];
+    pub fn followPoint(self: *Point, other: *Point) *Point {
+        self.target = other;
+        return self;
     }
 
-    pub fn deinit(self: *App) void {
-        self.allocator.free(self.buffer);
-    }
-
-    pub fn clearBuffer(self: *App) void {
-        var index: usize = 0;
-        while (index < self.buffer.len) : (index += 4) {
-            self.buffer[index + 0] = 100;
-            self.buffer[index + 1] = 255;
-            self.buffer[index + 2] = 123;
-            self.buffer[index + 3] = 255;
+    pub fn update(self: *Point) *Point {
+        if (self.target) |t| {
+            const dx = t.x - self.x;
+            const dy = t.y - self.y;
+            self.velocity_x += dx * 0.1;
+            self.velocity_y += dy * 0.1;
         }
-    }
 
-    pub fn drawPointToBuffer(self: *App, xx: f32, yy: f32, brightness: u8) void {
-        const cx: f32 = @floatFromInt(self.canvas.width);
-        const cy: f32 = @floatFromInt(self.canvas.height);
-        const x: i32 = @intFromFloat((xx / 2 + 0.5) * cx);
-        const y: i32 = @intFromFloat((yy / 2 + 0.5) * cy);
+        self.x += self.velocity_x;
+        self.y += self.velocity_y;
 
-        if (x >= 0 and y >= 0 and x < self.canvas.width and y < self.canvas.height) {
-            const buffer_index: usize = (@as(usize, @intCast(y)) * self.canvas.width + @as(usize, @intCast(x))) * 4;
-            if (buffer_index + 3 < self.buffer.len) {
-                @memset(self.buffer[buffer_index..][0..4], brightness);
-                self.buffer[buffer_index + 3] = 255;
-            }
-        }
+        // Simple damping
+        self.velocity_x *= 0.99;
+        self.velocity_y *= 0.99;
+
+        // Basic boundary check
+        self.x = math.clamp(self.x, 0, 255);
+        self.y = math.clamp(self.y, 0, 255);
+
+        return self;
     }
 };
 
-export fn init(width: u32, height: u32) void {
-    const allocator = std.heap.page_allocator;
-    app = App.init(allocator, width, height) catch unreachable;
-    defer app.deinit();
+pub const Rasterizer = struct {
+    width: usize,
+    height: usize,
+    buffer: []u8,
+    allocator: Allocator,
 
-    _ = app.createPoint(0.0, 0.0, 1);
-
-    const p1 = app.createPoint(0.6, 0.6, 2);
-    const p2 = app.createPoint(0.0, 0.6, 2);
-    const p3 = app.createPoint(0.6, -0.6, 2);
-
-    _ = app.createForceAttractor(p1, 1);
-    _ = app.createForceAttractor(p2, 1);
-    _ = app.createForceAttractor(p3, 1);
-    _ = app.createForceSmoothRandom(0.04, 2);
-    // _ = app.createForceSmoothRandom(0.8, 2);
-
-    app.clearBuffer();
-}
-
-export fn go() [*]const u8 {
-    for (app.points) |point| {
-        app.drawPointToBuffer(point.x, point.y, 255);
+    pub fn init(allocator: Allocator, width: usize, height: usize) !Rasterizer {
+        const buffer = try allocator.alloc(u8, width * height * 4);
+        return Rasterizer{
+            .width = width,
+            .height = height,
+            .buffer = buffer,
+            .allocator = allocator,
+        };
     }
 
-    for (app.forces[0..app.force_count], 0..) |force, i| {
-        app.forces[i].process(app.points[0..]);
-        switch (force) {
-            .Attractor => |attractor| app.drawPointToBuffer(attractor.origin.x, attractor.origin.y, 0),
-            .Random => {},
+    pub fn deinit(self: *Rasterizer) void {
+        self.allocator.free(self.buffer);
+    }
+
+    pub fn clear(self: *Rasterizer) void {
+        @memset(self.buffer, 0);
+    }
+
+    pub fn paintCircle(self: *Rasterizer, center: Point, radius: f32) void {
+        const x0: i32 = @intFromFloat(center.x);
+        const y0: i32 = @intFromFloat(center.y);
+        var r: i32 = @intFromFloat(radius);
+
+        var x: i32 = -r;
+        var y: i32 = 0;
+        var err: i32 = 2 - 2 * r;
+
+        while (x < 0) : ({
+            r = err;
+            if (r <= y) {
+                y += 1;
+                err += y * 2 + 1;
+            }
+            if (r > x or err > y) {
+                x += 1;
+                err += x * 2 + 1;
+            }
+        }) {
+            self.setPixel(x0 - x, y0 + y);
+            self.setPixel(x0 - y, y0 - x);
+            self.setPixel(x0 + x, y0 - y);
+            self.setPixel(x0 + y, y0 + x);
         }
     }
 
-    return app.buffer.ptr;
+    fn setPixel(self: *Rasterizer, x: i32, y: i32) void {
+        if (x < 0 or x >= self.width or y < 0 or y >= self.height) {
+            return;
+        }
+
+        const index = @as(usize, @intCast(y)) * self.width + @as(usize, @intCast(x));
+        self.buffer[index] = 255;
+    }
+
+    pub fn getBufferPtr(self: *Rasterizer) [*]u8 {
+        return self.buffer.ptr;
+    }
+};
+
+// Allocate 2 points on stack
+var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+var points = [_]Point{
+    Point.init(),
+    Point.init(),
+};
+
+var rasterizer: Rasterizer = undefined;
+
+export fn init(width: usize, height: usize) void {
+    const allocator = gpa.allocator();
+
+    rasterizer = Rasterizer.init(allocator, width, height) catch unreachable;
+
+    _ = points[0]
+        .setPosition(100, 100)
+        .setVelocity(1, 1.5);
+    _ = points[1]
+        .setPosition(200, 200)
+        .followPoint(&points[0]);
 }
 
-fn log(message: []const u8) void {
-    js_console_log(message.ptr, message.len);
+export fn go() [*]const u8 {
+    rasterizer.clear();
+
+    for (&points) |*point| {
+        _ = point.update();
+        rasterizer.paintCircle(point.*, 5);
+    }
+
+    return rasterizer.getBufferPtr();
 }
 
-fn logInt(value: i32) void {
-    var buf: [32]u8 = undefined;
-    const formatted = std.fmt.bufPrint(&buf, "{d}", .{value}) catch return;
-    log(formatted);
+export fn deinit() void {
+    rasterizer.deinit();
+    _ = gpa.deinit();
 }
