@@ -263,13 +263,13 @@ var points = [_]Point{
     Point.init(),
 };
 
-var rasterizer: Canvas = undefined;
+var canvas: Canvas = undefined;
 
 export fn init(width: usize, height: usize) void {
     const allocator = gpa.allocator();
 
-    rasterizer = Canvas.init(allocator, width, height) catch unreachable;
-    rasterizer.setClearColor(.White);
+    canvas = Canvas.init(allocator, width, height) catch unreachable;
+    canvas.setClearColor(.White);
 
     _ = points[0]
         .setPosition(0.9, -0.9)
@@ -280,32 +280,29 @@ export fn init(width: usize, height: usize) void {
     _ = points[2]
         .setPosition(-0.5, 0.8)
         .setVelocity(0.004, -0.004);
-
-    // Control point for bezier curve
     _ = points[3]
         .setPosition(0.9, 0.9)
         .setVelocity(-0.008, -0.008);
-    // .followPoint(&points[1]);
 }
 
 export fn go() [*]const u8 {
-    rasterizer.clear();
+    canvas.clear();
 
     for (&points) |*point| {
         _ = point.update();
     }
-    rasterizer.paintCircle(points[0], 0.1, 0.01);
-    rasterizer.paintCircle(points[1], 0.1, 0.01);
-    rasterizer.paintCircle(points[2], 0.1, 0.01);
-    rasterizer.paintCircle(points[3], 0.03, @abs(points[3].position[1]) / 4 + 0.01);
-    rasterizer.drawBezierCurve(points[0], points[1], points[3], 0.008, points[0].color);
-    rasterizer.drawBezierCurve(points[1], points[2], points[3], 0.008, points[0].color);
-    rasterizer.drawBezierCurve(points[2], points[0], points[3], points[0].position[0] / 4, points[0].color);
-    rasterizer.drawBezierCurve(points[0], points[1], points[3], 0.008, points[0].color);
-    return rasterizer.getBufferPtr();
+    canvas.paintCircle(points[0], 0.1, 0.01);
+    canvas.paintCircle(points[1], 0.1, 0.01);
+    canvas.paintCircle(points[2], 0.1, 0.01);
+    canvas.paintCircle(points[3], 0.03, @abs(points[3].position[1]) / 4 + 0.01);
+    canvas.drawBezierCurve(points[0], points[1], points[3], 0.008, points[0].color);
+    canvas.drawBezierCurve(points[1], points[2], points[3], 0.008, points[0].color);
+    canvas.drawBezierCurve(points[2], points[0], points[3], 0.008, points[0].color);
+    canvas.drawBezierCurve(points[0], points[1], points[3], 0.008, points[0].color);
+    return canvas.getBufferPtr();
 }
 
 export fn deinit() void {
-    rasterizer.deinit();
+    canvas.deinit();
     _ = gpa.deinit();
 }
