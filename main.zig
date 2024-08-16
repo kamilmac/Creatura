@@ -33,7 +33,7 @@ pub const Point = struct {
             .position = .{ 0, 0 },
             .velocity = .{ 0, 0 },
             .target = null,
-            .color = .Red,
+            .color = .Black,
         };
     }
 
@@ -175,6 +175,36 @@ pub const Canvas = struct {
         }
     }
 
+    pub fn drawBezierCurve(self: *Canvas, start: Point, end: Point, control: Point, stroke_width: f32, color: Color) void {
+        const start_screen = self.translateToScreenSpace(start.position[0], start.position[1]);
+        const end_screen = self.translateToScreenSpace(end.position[0], end.position[1]);
+        const control_screen = self.translateToScreenSpace(control.position[0], control.position[1]);
+
+        const steps = 1000; // Increase for smoother curve
+        const half_width = @as(i32, @intFromFloat(stroke_width * @as(f32, @floatFromInt(self.width)) * 0.25));
+
+        var t: f32 = 0;
+        while (t <= 1.0) : (t += 1.0 / @as(f32, steps)) {
+            const x = @as(i32, @intFromFloat(math.pow(f32, 1 - t, 2) * @as(f32, @floatFromInt(start_screen.x)) +
+                2 * (1 - t) * t * @as(f32, @floatFromInt(control_screen.x)) +
+                math.pow(f32, t, 2) * @as(f32, @floatFromInt(end_screen.x))));
+            const y = @as(i32, @intFromFloat(math.pow(f32, 1 - t, 2) * @as(f32, @floatFromInt(start_screen.y)) +
+                2 * (1 - t) * t * @as(f32, @floatFromInt(control_screen.y)) +
+                math.pow(f32, t, 2) * @as(f32, @floatFromInt(end_screen.y))));
+
+            // Draw a filled circle at each point for smooth, thick lines
+            var dy: i32 = -half_width;
+            while (dy <= half_width) : (dy += 1) {
+                var dx: i32 = -half_width;
+                while (dx <= half_width) : (dx += 1) {
+                    if (dx * dx + dy * dy <= half_width * half_width) {
+                        self.setPixel(x + dx, y + dy, color);
+                    }
+                }
+            }
+        }
+    }
+
     fn fillRect(self: *Canvas, x1: i32, y1: i32, x2: i32, y2: i32, color: Color) void {
         const start_x = @max(0, @min(x1, x2));
         const end_x = @min(@as(i32, @intCast(self.width)) - 1, @max(x1, x2));
@@ -230,6 +260,7 @@ var points = [_]Point{
     Point.init(),
     Point.init(),
     Point.init(),
+    Point.init(),
 };
 
 var rasterizer: Canvas = undefined;
@@ -242,16 +273,19 @@ export fn init(width: usize, height: usize) void {
 
     _ = points[0]
         .setPosition(0.9, -0.9)
-        .setColor(.Black)
         .setVelocity(-0.008, 0.004);
     _ = points[1]
         .setPosition(0.0, 0.0)
-        .setColor(.Black)
         .followPoint(&points[2]);
     _ = points[2]
         .setPosition(-0.5, 0.8)
-        .setColor(.Black)
         .setVelocity(0.004, -0.004);
+
+    // Control point for bezier curve
+    _ = points[3]
+        .setPosition(0.9, 0.9)
+        .setVelocity(-0.008, -0.008);
+    // .followPoint(&points[1]);
 }
 
 export fn go() [*]const u8 {
@@ -259,11 +293,15 @@ export fn go() [*]const u8 {
 
     for (&points) |*point| {
         _ = point.update();
-        rasterizer.paintCircle(point.*, 0.1, 0.01);
     }
-    rasterizer.drawLine(points[0], points[1], 0.004, points[0].color);
-    rasterizer.drawLine(points[1], points[2], 0.004, points[0].color);
-    rasterizer.drawLine(points[2], points[0], 0.004, points[0].color);
+    rasterizer.paintCircle(points[0], 0.1, 0.01);
+    rasterizer.paintCircle(points[1], 0.1, 0.01);
+    rasterizer.paintCircle(points[2], 0.1, 0.01);
+    rasterizer.paintCircle(points[3], 0.03, @abs(points[3].position[1]) / 4 + 0.01);
+    rasterizer.drawBezierCurve(points[0], points[1], points[3], 0.008, points[0].color);
+    rasterizer.drawBezierCurve(points[1], points[2], points[3], 0.008, points[0].color);
+    rasterizer.drawBezierCurve(points[2], points[0], points[3], points[0].position[0] / 4, points[0].color);
+    rasterizer.drawBezierCurve(points[0], points[1], points[3], 0.008, points[0].color);
     return rasterizer.getBufferPtr();
 }
 
