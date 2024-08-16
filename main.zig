@@ -52,8 +52,8 @@ pub const Point = struct {
         self.velocity_y *= 0.99;
 
         // Basic boundary check
-        self.x = math.clamp(self.x, 0, 255);
-        self.y = math.clamp(self.y, 0, 255);
+        self.x = math.clamp(self.x, -1.0, 1.0);
+        self.y = math.clamp(self.y, -1.0, 1.0);
 
         return self;
     }
@@ -80,28 +80,32 @@ pub const Rasterizer = struct {
     }
 
     pub fn clear(self: *Rasterizer) void {
-        @memset(self.buffer, 0);
+        var i: usize = 0;
+        while (i < self.buffer.len) : (i += 4) {
+            self.buffer[i] = 173; // R
+            self.buffer[i + 1] = 216; // G
+            self.buffer[i + 2] = 230; // B
+            self.buffer[i + 3] = 255; // A
+        }
     }
 
     pub fn paintCircle(self: *Rasterizer, center: Point, radius: f32) void {
-        const x0: i32 = @intFromFloat(center.x);
-        const y0: i32 = @intFromFloat(center.y);
-        var r: i32 = @intFromFloat(radius);
+        const x0: i32 = @intFromFloat((center.x + 1) * 0.5 * @as(f32, @floatFromInt(self.width)));
+        const y0: i32 = @intFromFloat((1 - center.y) * 0.5 * @as(f32, @floatFromInt(self.height)));
+        const r: i32 = @intFromFloat(radius * @as(f32, @floatFromInt(self.width)) * 0.5);
 
         var x: i32 = -r;
         var y: i32 = 0;
         var err: i32 = 2 - 2 * r;
 
         while (x < 0) : ({
-            r = err;
-            if (r <= y) {
+            err = if (r <= y) blk: {
                 y += 1;
-                err += y * 2 + 1;
-            }
-            if (r > x or err > y) {
+                break :blk err + y * 2 + 1;
+            } else if (r > x or err > y) blk: {
                 x += 1;
-                err += x * 2 + 1;
-            }
+                break :blk err + x * 2 + 1;
+            } else err;
         }) {
             self.setPixel(x0 - x, y0 + y);
             self.setPixel(x0 - y, y0 - x);
@@ -111,12 +115,15 @@ pub const Rasterizer = struct {
     }
 
     fn setPixel(self: *Rasterizer, x: i32, y: i32) void {
-        if (x < 0 or x >= self.width or y < 0 or y >= self.height) {
+        if (x < 0 or x >= @as(i32, @intCast(self.width)) or y < 0 or y >= @as(i32, @intCast(self.height))) {
             return;
         }
 
-        const index = @as(usize, @intCast(y)) * self.width + @as(usize, @intCast(x));
-        self.buffer[index] = 255;
+        const index = (@as(usize, @intCast(y)) * self.width + @as(usize, @intCast(x))) * 4;
+        self.buffer[index] = 255; // R
+        self.buffer[index + 1] = 0; // G
+        self.buffer[index + 2] = 0; // B
+        self.buffer[index + 3] = 255; // A
     }
 
     pub fn getBufferPtr(self: *Rasterizer) [*]u8 {
@@ -139,10 +146,10 @@ export fn init(width: usize, height: usize) void {
     rasterizer = Rasterizer.init(allocator, width, height) catch unreachable;
 
     _ = points[0]
-        .setPosition(100, 100)
-        .setVelocity(1, 1.5);
+        .setPosition(0.0, 0.0)
+        .setVelocity(0.001, 0.0015);
     _ = points[1]
-        .setPosition(200, 200)
+        .setPosition(0.2, 0.2)
         .followPoint(&points[0]);
 }
 
