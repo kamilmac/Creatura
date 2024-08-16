@@ -27,6 +27,11 @@ pub const Point = struct {
     velocity: [2]f32,
     target: ?*Point,
     color: Color,
+    oscillation: struct {
+        amplitude: [2]f32,
+        frequency: [2]f32,
+        offset: f32,
+    },
 
     pub fn init() Point {
         return .{
@@ -34,6 +39,11 @@ pub const Point = struct {
             .velocity = .{ 0, 0 },
             .target = null,
             .color = .Black,
+            .oscillation = .{
+                .amplitude = .{ 0, 0 },
+                .frequency = .{ 0, 0 },
+                .offset = 0,
+            },
         };
     }
 
@@ -56,6 +66,21 @@ pub const Point = struct {
         self.color = new_color;
         return self;
     }
+    pub fn setOscillation(self: *Point, amplitude_x: f32, amplitude_y: f32, frequency_x: f32, frequency_y: f32) *Point {
+        self.oscillation.amplitude = .{ amplitude_x, amplitude_y };
+        self.oscillation.frequency = .{ frequency_x, frequency_y };
+        return self;
+    }
+
+    fn oscillate(self: *Point) void {
+        const dx = self.oscillation.amplitude[0] * @sin(self.oscillation.frequency[0] * self.oscillation.offset);
+        const dy = self.oscillation.amplitude[1] * @sin(self.oscillation.frequency[1] * self.oscillation.offset);
+
+        self.position[0] += dx;
+        self.position[1] += dy;
+
+        self.oscillation.offset += 0.1; // Increment offset for next frame
+    }
 
     pub fn update(self: *Point) *Point {
         if (self.target) |t| {
@@ -68,13 +93,16 @@ pub const Point = struct {
         self.position[0] += self.velocity[0];
         self.position[1] += self.velocity[1];
 
+        // Apply oscillation
+        self.oscillate();
+
         // Simple damping
         self.velocity[0] *= 0.994;
         self.velocity[1] *= 0.994;
 
         // Basic boundary check
-        self.position[0] = math.clamp(self.position[0], -1.0, 1.0);
-        self.position[1] = math.clamp(self.position[1], -1.0, 1.0);
+        self.position[0] = @max(-1.0, @min(self.position[0], 1.0));
+        self.position[1] = @max(-1.0, @min(self.position[1], 1.0));
 
         return self;
     }
@@ -300,6 +328,93 @@ pub const Canvas = struct {
         }
     }
 
+    pub fn fastBlur(self: *Canvas, radius: usize) void {
+        const temp_buffer = self.allocator.alloc(u8, self.buffer.len) catch unreachable;
+        defer self.allocator.free(temp_buffer);
+
+        const integral = self.allocator.alloc([4]u32, (self.width + 1) * (self.height + 1)) catch unreachable;
+        defer self.allocator.free(integral);
+
+        // Calculate integral image
+        var y: usize = 0;
+        while (y <= self.height) : (y += 1) {
+            var x: usize = 0;
+            while (x <= self.width) : (x += 1) {
+                if (x == 0 or y == 0) {
+                    integral[y * (self.width + 1) + x] = .{ 0, 0, 0, 0 };
+                } else {
+                    const index = ((y - 1) * self.width + (x - 1)) * 4;
+                    integral[y * (self.width + 1) + x] = .{
+                        integral[(y - 1) * (self.width + 1) + x][0] +
+                            integral[y * (self.width + 1) + (x - 1)][0] -
+                            integral[(y - 1) * (self.width + 1) + (x - 1)][0] +
+                            self.buffer[index],
+
+                        integral[(y - 1) * (self.width + 1) + x][1] +
+                            integral[y * (self.width + 1) + (x - 1)][1] -
+                            integral[(y - 1) * (self.width + 1) + (x - 1)][1] +
+                            self.buffer[index + 1],
+
+                        integral[(y - 1) * (self.width + 1) + x][2] +
+                            integral[y * (self.width + 1) + (x - 1)][2] -
+                            integral[(y - 1) * (self.width + 1) + (x - 1)][2] +
+                            self.buffer[index + 2],
+
+                        integral[(y - 1) * (self.width + 1) + x][3] +
+                            integral[y * (self.width + 1) + (x - 1)][3] -
+                            integral[(y - 1) * (self.width + 1) + (x - 1)][3] +
+                            self.buffer[index + 3],
+                    };
+                }
+            }
+        }
+
+        // Apply box blur using integral image
+        y = 0;
+        while (y < self.height) : (y += 1) {
+            var x: usize = 0;
+            while (x < self.width) : (x += 1) {
+                const x1 = if (x >= radius) x - radius else 0;
+                const y1 = if (y >= radius) y - radius else 0;
+                const x2 = if (x + radius < self.width) x + radius else self.width - 1;
+                const y2 = if (y + radius < self.height) y + radius else self.height - 1;
+
+                const count = (x2 - x1 + 1) * (y2 - y1 + 1);
+
+                const sum = [4]u32{
+                    integral[(y2 + 1) * (self.width + 1) + (x2 + 1)][0] -
+                        integral[(y1) * (self.width + 1) + (x2 + 1)][0] -
+                        integral[(y2 + 1) * (self.width + 1) + x1][0] +
+                        integral[y1 * (self.width + 1) + x1][0],
+
+                    integral[(y2 + 1) * (self.width + 1) + (x2 + 1)][1] -
+                        integral[(y1) * (self.width + 1) + (x2 + 1)][1] -
+                        integral[(y2 + 1) * (self.width + 1) + x1][1] +
+                        integral[y1 * (self.width + 1) + x1][1],
+
+                    integral[(y2 + 1) * (self.width + 1) + (x2 + 1)][2] -
+                        integral[(y1) * (self.width + 1) + (x2 + 1)][2] -
+                        integral[(y2 + 1) * (self.width + 1) + x1][2] +
+                        integral[y1 * (self.width + 1) + x1][2],
+
+                    integral[(y2 + 1) * (self.width + 1) + (x2 + 1)][3] -
+                        integral[(y1) * (self.width + 1) + (x2 + 1)][3] -
+                        integral[(y2 + 1) * (self.width + 1) + x1][3] +
+                        integral[y1 * (self.width + 1) + x1][3],
+                };
+
+                const index = (y * self.width + x) * 4;
+                temp_buffer[index] = @intCast(sum[0] / count);
+                temp_buffer[index + 1] = @intCast(sum[1] / count);
+                temp_buffer[index + 2] = @intCast(sum[2] / count);
+                temp_buffer[index + 3] = @intCast(sum[3] / count);
+            }
+        }
+
+        // Copy result back to main buffer
+        @memcpy(self.buffer, temp_buffer);
+    }
+
     pub fn getBufferPtr(self: *Canvas) [*]u8 {
         return self.buffer.ptr;
     }
@@ -324,12 +439,15 @@ export fn init(width: usize, height: usize) void {
 
     _ = points[0]
         .setPosition(0.9, -0.9)
+        .setOscillation(0.04, 0.04, 2, 1)
         .setVelocity(-0.008, 0.004);
     _ = points[1]
         .setPosition(0.0, 0.0)
+        .setOscillation(0.04, 0.04, 2, 1)
         .followPoint(&points[2]);
     _ = points[2]
         .setPosition(-0.5, 0.8)
+        .setOscillation(0.01, 0.01, 2, 1)
         .setVelocity(0.004, -0.004);
     _ = points[3]
         .setPosition(0.9, 0.9)
@@ -345,13 +463,13 @@ export fn go() [*]const u8 {
     canvas.paintCircle(points[0], 0.1, 0.01);
     canvas.paintCircle(points[1], 0.1, 0.01);
     canvas.paintCircle(points[2], 0.1, 0.01);
-    canvas.paintCircle(points[3], 0.03, @abs(points[3].position[1]) / 4 + 0.01);
-    canvas.drawBezierCurve(points[0], points[1], points[3], 0.008, points[0].color);
-    canvas.drawBezierCurve(points[1], points[2], points[3], 0.008, points[0].color);
-    canvas.drawBezierCurve(points[2], points[0], points[3], 0.008, points[0].color);
-    canvas.drawBezierCurve(points[0], points[1], points[3], 0.008, points[0].color);
-    // canvas.pixelate(@intFromFloat(@abs(points[0].position[0]) * 128));
-    canvas.chromaticAberration(8, 8);
+    canvas.paintCircle(points[3], 0.03, @abs(points[0].position[1]) / 4 + 0.01);
+    canvas.drawBezierCurve(points[0], points[1], points[3], 0.012, points[0].color);
+    canvas.drawBezierCurve(points[1], points[2], points[3], 0.012, points[0].color);
+    canvas.drawBezierCurve(points[2], points[0], points[3], 0.012, points[0].color);
+    canvas.drawBezierCurve(points[0], points[1], points[3], 0.012, points[0].color);
+    canvas.chromaticAberration(8, 12);
+    canvas.fastBlur(@intFromFloat(@abs(points[0].position[0]) * 16));
     return canvas.getBufferPtr();
 }
 
