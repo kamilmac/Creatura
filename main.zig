@@ -415,6 +415,48 @@ pub const Canvas = struct {
         @memcpy(self.buffer, temp_buffer);
     }
 
+    // Simple Linear Congruential Generator
+    const LCG = struct {
+        state: u32,
+
+        pub fn init(seed: u32) LCG {
+            return LCG{ .state = seed };
+        }
+
+        pub fn next(self: *LCG) u32 {
+            self.state = (1103515245 * self.state + 12345) & 0x7fffffff;
+            return self.state;
+        }
+
+        pub fn nextFloat(self: *LCG) f32 {
+            return @as(f32, @floatFromInt(self.next())) / @as(f32, @floatFromInt(0x7fffffff));
+        }
+    };
+
+    pub fn addFilmGrain(self: *Canvas, intensity: f32, seed: u32) void {
+        var rng = LCG.init(seed);
+
+        var y: usize = 0;
+        while (y < self.height) : (y += 1) {
+            var x: usize = 0;
+            while (x < self.width) : (x += 1) {
+                const index = (y * self.width + x) * 4;
+
+                // Generate random noise value
+                const noise = (rng.nextFloat() - 0.5) * intensity;
+
+                // Apply noise to each channel
+                inline for (0..3) |i| {
+                    const pixel_value = @as(f32, @floatFromInt(self.buffer[index + i]));
+                    const new_value = @min(255, @max(0, pixel_value + noise * 255));
+                    self.buffer[index + i] = @intFromFloat(new_value);
+                }
+
+                // Don't modify alpha channel
+            }
+        }
+    }
+
     pub fn getBufferPtr(self: *Canvas) [*]u8 {
         return self.buffer.ptr;
     }
@@ -468,8 +510,9 @@ export fn go() [*]const u8 {
     canvas.drawBezierCurve(points[1], points[2], points[3], 0.012, points[0].color);
     canvas.drawBezierCurve(points[2], points[0], points[3], 0.012, points[0].color);
     canvas.drawBezierCurve(points[0], points[1], points[3], 0.012, points[0].color);
+    canvas.fastBlur(@intFromFloat(@abs(points[0].position[0]) * 64));
     canvas.chromaticAberration(8, 12);
-    canvas.fastBlur(@intFromFloat(@abs(points[0].position[0]) * 16));
+    canvas.addFilmGrain(0.4, @intFromFloat(@abs(points[0].position[0]) * 16));
     return canvas.getBufferPtr();
 }
 
