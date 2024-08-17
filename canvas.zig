@@ -1,5 +1,5 @@
 const std = @import("std");
-const Point = @import("main.zig").Point;
+const Point = @import("point.zig").Point;
 const Color = @import("main.zig").Color;
 
 pub const Canvas = struct {
