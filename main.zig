@@ -11,6 +11,10 @@ var points = [_]Point{
     Point.init(),
     Point.init(),
     Point.init(),
+    Point.init(),
+    Point.init(),
+    Point.init(),
+    Point.init(),
 };
 
 var canvas: Canvas = undefined;
@@ -36,6 +40,15 @@ export fn init(width: usize, height: usize) void {
     _ = points[3]
         .setPosition(0.9, 0.9)
         .setVelocity(-0.008, -0.008);
+
+    _ = points[4]
+        .setPosition(-0.6, 0.6);
+    _ = points[5]
+        .setPosition(0.6, 0.6);
+    _ = points[6]
+        .setPosition(0.6, -0.6);
+    _ = points[7]
+        .setPosition(-0.6, -0.6);
 }
 
 export fn go() [*]const u8 {
@@ -47,13 +60,19 @@ export fn go() [*]const u8 {
     canvas.paintCircle(points[0], 0.1, 0.01);
     canvas.paintCircle(points[1], 0.1, 0.01);
     canvas.paintCircle(points[2], 0.1, 0.01);
-    canvas.paintCircle(points[3], 0.03, @abs(points[0].position[1]) / 4 + 0.01);
+    canvas.paintCircle(points[3], 0.3, @abs(points[0].position[1]) / 4 + 0.01);
+
+    canvas.paintCircle(points[4], 0.5, @abs(points[0].position[1]) / 4 + 0.01);
+    canvas.paintCircle(points[5], 0.37, @abs(points[1].position[1]) / 3 + 0.01);
+    canvas.paintCircle(points[6], 0.29, @abs(points[1].position[1]) / 4 + 0.01);
+    canvas.paintCircle(points[7], 0.22, @abs(points[0].position[1]) / 3 + 0.01);
+
     canvas.drawBezierCurve(points[0], points[1], points[3], 0.012, points[0].color);
     canvas.drawBezierCurve(points[1], points[2], points[3], 0.012, points[0].color);
     canvas.drawBezierCurve(points[2], points[0], points[3], 0.012, points[0].color);
     canvas.drawBezierCurve(points[0], points[1], points[3], 0.012, points[0].color);
     canvas.chromaticAberration(8, 8);
-    canvas.fastBlur(2, 16);
+    canvas.fastBlur(1, 20);
     canvas.addFilmGrain(0.2);
     return canvas.getBufferPtr();
 }
