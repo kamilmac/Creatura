@@ -1,6 +1,6 @@
 const CANVAS_HEIGHT = 1024;
 const CANVAS_WIDTH = 1024;
-const RENDER_SCALE = 2;
+const RENDER_SCALE = 1;
 const RENDER_WIDTH = CANVAS_WIDTH * RENDER_SCALE;
 const RENDER_HEIGHT = CANVAS_HEIGHT * RENDER_SCALE;
 
@@ -134,7 +134,7 @@ function main() {
 
   wasm.exports.init(RENDER_WIDTH, RENDER_HEIGHT);
 
-  const FRAME_RATE = 60;
+  const FRAME_RATE = 24;
   const FRAME_DURATION = 1000 / FRAME_RATE;
   let lastFrameTime = 0;
 
