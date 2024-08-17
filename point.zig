@@ -13,17 +13,7 @@ pub const Point = struct {
     },
 
     pub fn init() Point {
-        return .{
-            .position = .{ 0, 0 },
-            .velocity = .{ 0, 0 },
-            .target = null,
-            .color = .Black,
-            .oscillation = .{
-                .amplitude = .{ 0, 0 },
-                .frequency = .{ 0, 0 },
-                .offset = 0,
-            },
-        };
+        return initPoint();
     }
 
     pub fn setPosition(self: *Point, x: f32, y: f32) *Point {
@@ -52,38 +42,59 @@ pub const Point = struct {
         return self;
     }
 
-    fn oscillate(self: *Point) void {
-        const dx = self.oscillation.amplitude[0] * @sin(self.oscillation.frequency[0] * self.oscillation.offset);
-        const dy = self.oscillation.amplitude[1] * @sin(self.oscillation.frequency[1] * self.oscillation.offset);
-
-        self.position[0] += dx;
-        self.position[1] += dy;
-
-        self.oscillation.offset += 0.1; // Increment offset for next frame
-    }
-
     pub fn update(self: *Point) *Point {
-        if (self.target) |t| {
-            const dx = t.position[0] - self.position[0];
-            const dy = t.position[1] - self.position[1];
-            self.velocity[0] += dx * 0.1;
-            self.velocity[1] += dy * 0.1;
-        }
-
-        self.position[0] += self.velocity[0];
-        self.position[1] += self.velocity[1];
-
-        // Apply oscillation
-        self.oscillate();
-
-        // Simple damping
-        self.velocity[0] *= 0.994;
-        self.velocity[1] *= 0.994;
-
-        // Basic boundary check
-        self.position[0] = @max(-1.0, @min(self.position[0], 1.0));
-        self.position[1] = @max(-1.0, @min(self.position[1], 1.0));
-
+        updatePoint(self);
         return self;
     }
+
+    fn oscillate(self: *Point) void {
+        oscillatePoint(self);
+    }
 };
+
+fn initPoint() Point {
+    return .{
+        .position = .{ 0, 0 },
+        .velocity = .{ 0, 0 },
+        .target = null,
+        .color = .Black,
+        .oscillation = .{
+            .amplitude = .{ 0, 0 },
+            .frequency = .{ 0, 0 },
+            .offset = 0,
+        },
+    };
+}
+
+fn updatePoint(point: *Point) void {
+    if (point.target) |t| {
+        const dx = t.position[0] - point.position[0];
+        const dy = t.position[1] - point.position[1];
+        point.velocity[0] += dx * 0.1;
+        point.velocity[1] += dy * 0.1;
+    }
+
+    point.position[0] += point.velocity[0];
+    point.position[1] += point.velocity[1];
+
+    // Apply oscillation
+    point.oscillate();
+
+    // Simple damping
+    point.velocity[0] *= 0.994;
+    point.velocity[1] *= 0.994;
+
+    // Basic boundary check
+    point.position[0] = @max(-1.0, @min(point.position[0], 1.0));
+    point.position[1] = @max(-1.0, @min(point.position[1], 1.0));
+}
+
+fn oscillatePoint(point: *Point) void {
+    const dx = point.oscillation.amplitude[0] * @sin(point.oscillation.frequency[0] * point.oscillation.offset);
+    const dy = point.oscillation.amplitude[1] * @sin(point.oscillation.frequency[1] * point.oscillation.offset);
+
+    point.position[0] += dx;
+    point.position[1] += dy;
+
+    point.oscillation.offset += 0.1; // Increment offset for next frame
+}
