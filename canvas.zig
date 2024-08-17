@@ -47,8 +47,8 @@ pub const Canvas = struct {
         applyChromaticAberration(self, max_offset_x, max_offset_y);
     }
 
-    pub fn fastBlur(self: *Canvas, radius: usize) void {
-        applyFastBlur(self, radius);
+    pub fn fastBlur(self: *Canvas, min_radius: usize, max_radius: usize) void {
+        applyFastBlur(self, min_radius, max_radius);
     }
 
     pub fn addFilmGrain(self: *Canvas, intensity: f32) void {
@@ -287,7 +287,11 @@ fn applyChromaticAberration(self: *Canvas, max_offset_x: i32, max_offset_y: i32)
     }
 }
 
-fn applyFastBlur(canvas: *Canvas, radius: usize) void {
+fn applyFastBlur(canvas: *Canvas, min_radius: usize, max_radius: usize) void {
+    const center_x = @as(f32, @floatFromInt(canvas.width)) / 2;
+    const center_y = @as(f32, @floatFromInt(canvas.height)) / 2;
+    const max_distance = @sqrt(center_x * center_x + center_y * center_y);
+
     // Calculate integral image
     var y: usize = 0;
     while (y <= canvas.height) : (y += 1) {
@@ -312,11 +316,17 @@ fn applyFastBlur(canvas: *Canvas, radius: usize) void {
         }
     }
 
-    // Apply box blur using integral image
+    // Apply radial box blur using integral image
     y = 0;
     while (y < canvas.height) : (y += 1) {
         var x: usize = 0;
         while (x < canvas.width) : (x += 1) {
+            const dx = @as(f32, @floatFromInt(x)) - center_x;
+            const dy = @as(f32, @floatFromInt(y)) - center_y;
+            const distance = @sqrt(dx * dx + dy * dy);
+            const blur_factor = distance / max_distance;
+            const radius = @as(usize, @intFromFloat(@as(f32, @floatFromInt(min_radius)) + blur_factor * @as(f32, @floatFromInt(max_radius - min_radius))));
+
             const x1 = if (x >= radius) x - radius else 0;
             const y1 = if (y >= radius) y - radius else 0;
             const x2 = if (x + radius < canvas.width) x + radius else canvas.width - 1;
