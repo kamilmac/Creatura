@@ -273,16 +273,15 @@ fn applyFastBlur(canvas: *Canvas, radius: usize) void {
                 integral[y * (canvas.width + 1) + x] = .{ 0, 0, 0, 0 };
             } else {
                 const index = ((y - 1) * canvas.width + (x - 1)) * 4;
-                const V = @Vector(4, u32);
-                const current = V{
+                const current = @Vector(4, u32){
                     canvas.buffer[index],
                     canvas.buffer[index + 1],
                     canvas.buffer[index + 2],
                     canvas.buffer[index + 3],
                 };
-                const above = V{ integral[(y - 1) * (canvas.width + 1) + x][0], integral[(y - 1) * (canvas.width + 1) + x][1], integral[(y - 1) * (canvas.width + 1) + x][2], integral[(y - 1) * (canvas.width + 1) + x][3] };
-                const left = V{ integral[y * (canvas.width + 1) + (x - 1)][0], integral[y * (canvas.width + 1) + (x - 1)][1], integral[y * (canvas.width + 1) + (x - 1)][2], integral[y * (canvas.width + 1) + (x - 1)][3] };
-                const diagonal = V{ integral[(y - 1) * (canvas.width + 1) + (x - 1)][0], integral[(y - 1) * (canvas.width + 1) + (x - 1)][1], integral[(y - 1) * (canvas.width + 1) + (x - 1)][2], integral[(y - 1) * (canvas.width + 1) + (x - 1)][3] };
+                const above = @Vector(4, u32){ integral[(y - 1) * (canvas.width + 1) + x][0], integral[(y - 1) * (canvas.width + 1) + x][1], integral[(y - 1) * (canvas.width + 1) + x][2], integral[(y - 1) * (canvas.width + 1) + x][3] };
+                const left = @Vector(4, u32){ integral[y * (canvas.width + 1) + (x - 1)][0], integral[y * (canvas.width + 1) + (x - 1)][1], integral[y * (canvas.width + 1) + (x - 1)][2], integral[y * (canvas.width + 1) + (x - 1)][3] };
+                const diagonal = @Vector(4, u32){ integral[(y - 1) * (canvas.width + 1) + (x - 1)][0], integral[(y - 1) * (canvas.width + 1) + (x - 1)][1], integral[(y - 1) * (canvas.width + 1) + (x - 1)][2], integral[(y - 1) * (canvas.width + 1) + (x - 1)][3] };
                 const result = above + left - diagonal + current;
                 integral[y * (canvas.width + 1) + x] = .{ result[0], result[1], result[2], result[3] };
             }
@@ -301,14 +300,10 @@ fn applyFastBlur(canvas: *Canvas, radius: usize) void {
 
             const count = @as(u32, (x2 - x1 + 1) * (y2 - y1 + 1));
 
-            const V = @Vector(4, u32);
-            const sum = V{ integral[(y2 + 1) * (canvas.width + 1) + (x2 + 1)][0], integral[(y2 + 1) * (canvas.width + 1) + (x2 + 1)][1], integral[(y2 + 1) * (canvas.width + 1) + (x2 + 1)][2], integral[(y2 + 1) * (canvas.width + 1) + (x2 + 1)][3] } -
-                V{ integral[(y1) * (canvas.width + 1) + (x2 + 1)][0], integral[(y1) * (canvas.width + 1) + (x2 + 1)][1], integral[(y1) * (canvas.width + 1) + (x2 + 1)][2], integral[(y1) * (canvas.width + 1) + (x2 + 1)][3] } -
-                V{ integral[(y2 + 1) * (canvas.width + 1) + x1][0], integral[(y2 + 1) * (canvas.width + 1) + x1][1], integral[(y2 + 1) * (canvas.width + 1) + x1][2], integral[(y2 + 1) * (canvas.width + 1) + x1][3] } +
-                V{ integral[y1 * (canvas.width + 1) + x1][0], integral[y1 * (canvas.width + 1) + x1][1], integral[y1 * (canvas.width + 1) + x1][2], integral[y1 * (canvas.width + 1) + x1][3] };
+            const sum = @Vector(4, u32){ integral[(y2 + 1) * (canvas.width + 1) + (x2 + 1)][0], integral[(y2 + 1) * (canvas.width + 1) + (x2 + 1)][1], integral[(y2 + 1) * (canvas.width + 1) + (x2 + 1)][2], integral[(y2 + 1) * (canvas.width + 1) + (x2 + 1)][3] } - @Vector(4, u32){ integral[(y1) * (canvas.width + 1) + (x2 + 1)][0], integral[(y1) * (canvas.width + 1) + (x2 + 1)][1], integral[(y1) * (canvas.width + 1) + (x2 + 1)][2], integral[(y1) * (canvas.width + 1) + (x2 + 1)][3] } - @Vector(4, u32){ integral[(y2 + 1) * (canvas.width + 1) + x1][0], integral[(y2 + 1) * (canvas.width + 1) + x1][1], integral[(y2 + 1) * (canvas.width + 1) + x1][2], integral[(y2 + 1) * (canvas.width + 1) + x1][3] } + @Vector(4, u32){ integral[y1 * (canvas.width + 1) + x1][0], integral[y1 * (canvas.width + 1) + x1][1], integral[y1 * (canvas.width + 1) + x1][2], integral[y1 * (canvas.width + 1) + x1][3] };
 
             const index = (y * canvas.width + x) * 4;
-            const result = @divFloor(sum, V{ count, count, count, count });
+            const result = @divFloor(sum, @as(@Vector(4, u32), @splat(count)));
             temp_buffer[index] = @intCast(result[0]);
             temp_buffer[index + 1] = @intCast(result[1]);
             temp_buffer[index + 2] = @intCast(result[2]);
