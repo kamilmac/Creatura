@@ -13,6 +13,7 @@ pub const Canvas = struct {
     grain_size: usize,
     temp_buffer: []u8,
     integral_buffer: [][4]u32,
+    chromatic_buffer: []u8,
 
     pub fn init(allocator: std.mem.Allocator, width: usize, height: usize) !Canvas {
         return initCanvas(allocator, width, height);
@@ -86,6 +87,7 @@ fn initCanvas(allocator: std.mem.Allocator, width: usize, height: usize) !Canvas
     const grain_buffer = try allocator.alloc(i16, grain_size * grain_size);
     const temp_buffer = try allocator.alloc(u8, width * height * 4);
     const integral_buffer = try allocator.alloc([4]u32, (width + 1) * (height + 1));
+    const chromatic_buffer = try allocator.alloc(u8, width * height * 4);
 
     var canvas = Canvas{
         .width = width,
@@ -97,6 +99,7 @@ fn initCanvas(allocator: std.mem.Allocator, width: usize, height: usize) !Canvas
         .grain_size = grain_size,
         .temp_buffer = temp_buffer,
         .integral_buffer = integral_buffer,
+        .chromatic_buffer = chromatic_buffer,
     };
     try canvas.generateGrainPattern(12345);
     return canvas;
@@ -107,6 +110,7 @@ fn deinitCanvas(canvas: *Canvas) void {
     canvas.allocator.free(canvas.grain_buffer);
     canvas.allocator.free(canvas.temp_buffer);
     canvas.allocator.free(canvas.integral_buffer);
+    canvas.allocator.free(canvas.chromatic_buffer);
 }
 
 fn clearCanvas(canvas: *Canvas) void {
@@ -217,9 +221,7 @@ fn setClearColorForCanvas(canvas: *Canvas, color: Color) void {
 }
 
 fn applyChromaticAberration(self: *Canvas, max_offset_x: i32, max_offset_y: i32) void {
-    const temp_buffer = self.allocator.alloc(u8, self.buffer.len) catch unreachable;
-    defer self.allocator.free(temp_buffer);
-    @memcpy(temp_buffer, self.buffer);
+    @memcpy(self.chromatic_buffer, self.buffer);
 
     const center_x = @as(f32, @floatFromInt(self.width)) / 2;
     const center_y = @as(f32, @floatFromInt(self.height)) / 2;
@@ -263,7 +265,7 @@ fn applyChromaticAberration(self: *Canvas, max_offset_x: i32, max_offset_y: i32)
                         red_y >= 0 and red_y < @as(i32, @intCast(self.height)))
                     {
                         const red_index = (@as(usize, @intCast(red_y)) * self.width + @as(usize, @intCast(red_x))) * 4;
-                        self.buffer[index] = temp_buffer[red_index];
+                        self.buffer[index] = self.chromatic_buffer[red_index];
                     }
 
                     // Blue channel
@@ -273,12 +275,12 @@ fn applyChromaticAberration(self: *Canvas, max_offset_x: i32, max_offset_y: i32)
                         blue_y >= 0 and blue_y < @as(i32, @intCast(self.height)))
                     {
                         const blue_index = (@as(usize, @intCast(blue_y)) * self.width + @as(usize, @intCast(blue_x))) * 4 + 2;
-                        self.buffer[index + 2] = temp_buffer[blue_index];
+                        self.buffer[index + 2] = self.chromatic_buffer[blue_index];
                     }
 
                     // Green channel and alpha remain unchanged
-                    self.buffer[index + 1] = temp_buffer[index + 1];
-                    self.buffer[index + 3] = temp_buffer[index + 3];
+                    self.buffer[index + 1] = self.chromatic_buffer[index + 1];
+                    self.buffer[index + 3] = self.chromatic_buffer[index + 3];
                 }
             }
         }
