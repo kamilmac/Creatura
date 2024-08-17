@@ -1,5 +1,5 @@
 const std = @import("std");
-const Color = @import("main.zig").Color;
+const Color = @import("color.zig").Color;
 
 pub const Point = struct {
     position: [2]f32,

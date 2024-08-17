@@ -1,6 +1,6 @@
 const std = @import("std");
 const Point = @import("point.zig").Point;
-const Color = @import("main.zig").Color;
+const Color = @import("color.zig").Color;
 
 pub const Canvas = struct {
     width: usize,
