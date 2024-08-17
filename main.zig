@@ -54,7 +54,7 @@ export fn go() [*]const u8 {
     canvas.drawBezierCurve(points[0], points[1], points[3], 0.012, points[0].color);
     canvas.fastBlur(@intFromFloat(@abs(points[0].position[0]) * 64));
     canvas.chromaticAberration(8, 12);
-    canvas.addFilmGrain(0.4, @intFromFloat(@abs(points[0].position[0]) * 16));
+    canvas.addFilmGrain(0.4);
     return canvas.getBufferPtr();
 }
 

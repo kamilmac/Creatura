@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const Point = @import("point.zig").Point;
 const Color = @import("color.zig").Color;
 
@@ -8,6 +9,8 @@ pub const Canvas = struct {
     buffer: []u8,
     allocator: std.mem.Allocator,
     clear_pattern: [32]u8,
+    grain_buffer: []i16,
+    grain_size: usize,
 
     pub fn init(allocator: std.mem.Allocator, width: usize, height: usize) !Canvas {
         return initCanvas(allocator, width, height);
@@ -45,8 +48,8 @@ pub const Canvas = struct {
         applyFastBlur(self, radius);
     }
 
-    pub fn addFilmGrain(self: *Canvas, intensity: f32, seed: u32) void {
-        applyFilmGrain(self, intensity, seed);
+    pub fn addFilmGrain(self: *Canvas, intensity: f32) void {
+        applyFilmGrain(self, intensity);
     }
 
     pub fn getBufferPtr(self: *Canvas) [*]u8 {
@@ -64,17 +67,32 @@ pub const Canvas = struct {
     fn translateToScreenSpace(canvas: *const Canvas, x: f32, y: f32) [2]i32 {
         return translateToScreenSpaceOnCanvas(canvas, x, y);
     }
+
+    fn generateGrainPattern(self: *Canvas, seed: u32) !void {
+        var rng = LCG.init(seed);
+
+        for (self.grain_buffer) |*noise| {
+            // Pre-compute noise values in the range [-128, 127]
+            noise.* = @as(i16, @intFromFloat(rng.nextFloat() * 256 - 128));
+        }
+    }
 };
 
 fn initCanvas(allocator: std.mem.Allocator, width: usize, height: usize) !Canvas {
     const buffer = try allocator.alloc(u8, width * height * 4);
-    return Canvas{
+    const grain_size = 256; // You can adjust this value
+    const grain_buffer = try allocator.alloc(i16, grain_size * grain_size);
+    var canvas = Canvas{
         .width = width,
         .height = height,
         .buffer = buffer,
         .allocator = allocator,
         .clear_pattern = undefined,
+        .grain_buffer = grain_buffer,
+        .grain_size = grain_size,
     };
+    try canvas.generateGrainPattern(12345);
+    return canvas;
 }
 
 fn deinitCanvas(canvas: *Canvas) void {
@@ -255,27 +273,18 @@ fn applyFastBlur(canvas: *Canvas, radius: usize) void {
                 integral[y * (canvas.width + 1) + x] = .{ 0, 0, 0, 0 };
             } else {
                 const index = ((y - 1) * canvas.width + (x - 1)) * 4;
-                integral[y * (canvas.width + 1) + x] = .{
-                    integral[(y - 1) * (canvas.width + 1) + x][0] +
-                        integral[y * (canvas.width + 1) + (x - 1)][0] -
-                        integral[(y - 1) * (canvas.width + 1) + (x - 1)][0] +
-                        canvas.buffer[index],
-
-                    integral[(y - 1) * (canvas.width + 1) + x][1] +
-                        integral[y * (canvas.width + 1) + (x - 1)][1] -
-                        integral[(y - 1) * (canvas.width + 1) + (x - 1)][1] +
-                        canvas.buffer[index + 1],
-
-                    integral[(y - 1) * (canvas.width + 1) + x][2] +
-                        integral[y * (canvas.width + 1) + (x - 1)][2] -
-                        integral[(y - 1) * (canvas.width + 1) + (x - 1)][2] +
-                        canvas.buffer[index + 2],
-
-                    integral[(y - 1) * (canvas.width + 1) + x][3] +
-                        integral[y * (canvas.width + 1) + (x - 1)][3] -
-                        integral[(y - 1) * (canvas.width + 1) + (x - 1)][3] +
-                        canvas.buffer[index + 3],
+                const V = @Vector(4, u32);
+                const current = V{
+                    canvas.buffer[index],
+                    canvas.buffer[index + 1],
+                    canvas.buffer[index + 2],
+                    canvas.buffer[index + 3],
                 };
+                const above = V{ integral[(y - 1) * (canvas.width + 1) + x][0], integral[(y - 1) * (canvas.width + 1) + x][1], integral[(y - 1) * (canvas.width + 1) + x][2], integral[(y - 1) * (canvas.width + 1) + x][3] };
+                const left = V{ integral[y * (canvas.width + 1) + (x - 1)][0], integral[y * (canvas.width + 1) + (x - 1)][1], integral[y * (canvas.width + 1) + (x - 1)][2], integral[y * (canvas.width + 1) + (x - 1)][3] };
+                const diagonal = V{ integral[(y - 1) * (canvas.width + 1) + (x - 1)][0], integral[(y - 1) * (canvas.width + 1) + (x - 1)][1], integral[(y - 1) * (canvas.width + 1) + (x - 1)][2], integral[(y - 1) * (canvas.width + 1) + (x - 1)][3] };
+                const result = above + left - diagonal + current;
+                integral[y * (canvas.width + 1) + x] = .{ result[0], result[1], result[2], result[3] };
             }
         }
     }
@@ -290,35 +299,20 @@ fn applyFastBlur(canvas: *Canvas, radius: usize) void {
             const x2 = if (x + radius < canvas.width) x + radius else canvas.width - 1;
             const y2 = if (y + radius < canvas.height) y + radius else canvas.height - 1;
 
-            const count = (x2 - x1 + 1) * (y2 - y1 + 1);
+            const count = @as(u32, (x2 - x1 + 1) * (y2 - y1 + 1));
 
-            const sum = [4]u32{
-                integral[(y2 + 1) * (canvas.width + 1) + (x2 + 1)][0] -
-                    integral[(y1) * (canvas.width + 1) + (x2 + 1)][0] -
-                    integral[(y2 + 1) * (canvas.width + 1) + x1][0] +
-                    integral[y1 * (canvas.width + 1) + x1][0],
-
-                integral[(y2 + 1) * (canvas.width + 1) + (x2 + 1)][1] -
-                    integral[(y1) * (canvas.width + 1) + (x2 + 1)][1] -
-                    integral[(y2 + 1) * (canvas.width + 1) + x1][1] +
-                    integral[y1 * (canvas.width + 1) + x1][1],
-
-                integral[(y2 + 1) * (canvas.width + 1) + (x2 + 1)][2] -
-                    integral[(y1) * (canvas.width + 1) + (x2 + 1)][2] -
-                    integral[(y2 + 1) * (canvas.width + 1) + x1][2] +
-                    integral[y1 * (canvas.width + 1) + x1][2],
-
-                integral[(y2 + 1) * (canvas.width + 1) + (x2 + 1)][3] -
-                    integral[(y1) * (canvas.width + 1) + (x2 + 1)][3] -
-                    integral[(y2 + 1) * (canvas.width + 1) + x1][3] +
-                    integral[y1 * (canvas.width + 1) + x1][3],
-            };
+            const V = @Vector(4, u32);
+            const sum = V{ integral[(y2 + 1) * (canvas.width + 1) + (x2 + 1)][0], integral[(y2 + 1) * (canvas.width + 1) + (x2 + 1)][1], integral[(y2 + 1) * (canvas.width + 1) + (x2 + 1)][2], integral[(y2 + 1) * (canvas.width + 1) + (x2 + 1)][3] } -
+                V{ integral[(y1) * (canvas.width + 1) + (x2 + 1)][0], integral[(y1) * (canvas.width + 1) + (x2 + 1)][1], integral[(y1) * (canvas.width + 1) + (x2 + 1)][2], integral[(y1) * (canvas.width + 1) + (x2 + 1)][3] } -
+                V{ integral[(y2 + 1) * (canvas.width + 1) + x1][0], integral[(y2 + 1) * (canvas.width + 1) + x1][1], integral[(y2 + 1) * (canvas.width + 1) + x1][2], integral[(y2 + 1) * (canvas.width + 1) + x1][3] } +
+                V{ integral[y1 * (canvas.width + 1) + x1][0], integral[y1 * (canvas.width + 1) + x1][1], integral[y1 * (canvas.width + 1) + x1][2], integral[y1 * (canvas.width + 1) + x1][3] };
 
             const index = (y * canvas.width + x) * 4;
-            temp_buffer[index] = @intCast(sum[0] / count);
-            temp_buffer[index + 1] = @intCast(sum[1] / count);
-            temp_buffer[index + 2] = @intCast(sum[2] / count);
-            temp_buffer[index + 3] = @intCast(sum[3] / count);
+            const result = @divFloor(sum, V{ count, count, count, count });
+            temp_buffer[index] = @intCast(result[0]);
+            temp_buffer[index + 1] = @intCast(result[1]);
+            temp_buffer[index + 2] = @intCast(result[2]);
+            temp_buffer[index + 3] = @intCast(result[3]);
         }
     }
 
@@ -344,25 +338,22 @@ const LCG = struct {
     }
 };
 
-fn applyFilmGrain(canvas: *Canvas, intensity: f32, seed: u32) void {
-    var rng = LCG.init(seed);
+pub fn applyFilmGrain(self: *Canvas, intensity: f32) void {
+    const scaled_intensity = @as(i32, @intFromFloat(intensity * 256)); // Pre-compute scaled intensity
+
     var y: usize = 0;
-    while (y < canvas.height) : (y += 1) {
+    while (y < self.height) : (y += 1) {
         var x: usize = 0;
-        while (x < canvas.width) : (x += 1) {
-            const index = (y * canvas.width + x) * 4;
+        while (x < self.width) : (x += 1) {
+            const index = (y * self.width + x) * 4;
+            const grain_index = (y % self.grain_size) * self.grain_size + (x % self.grain_size);
+            const noise = (self.grain_buffer[grain_index] * scaled_intensity) >> 8; // Fast division by 256
 
-            // Generate random noise value
-            const noise = (rng.nextFloat() - 0.5) * intensity;
-
-            // Apply noise to each channel
             inline for (0..3) |i| {
-                const pixel_value = @as(f32, @floatFromInt(canvas.buffer[index + i]));
-                const new_value = @min(255, @max(0, pixel_value + noise * 255));
-                canvas.buffer[index + i] = @intFromFloat(new_value);
+                const pixel_value = @as(i32, self.buffer[index + i]);
+                const new_value = @as(u8, @intCast(@min(255, @max(0, pixel_value + noise))));
+                self.buffer[index + i] = new_value;
             }
-
-            // Don't modify alpha channel
         }
     }
 }
