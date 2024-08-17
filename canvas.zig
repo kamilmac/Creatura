@@ -2,24 +2,6 @@ const std = @import("std");
 const Point = @import("main.zig").Point;
 const Color = @import("main.zig").Color;
 
-// Simple Linear Congruential Generator
-const LCG = struct {
-    state: u32,
-
-    pub fn init(seed: u32) LCG {
-        return LCG{ .state = seed };
-    }
-
-    pub fn next(self: *LCG) u32 {
-        self.state = (1103515245 * self.state + 12345) & 0x7fffffff;
-        return self.state;
-    }
-
-    pub fn nextFloat(self: *LCG) f32 {
-        return @as(f32, @floatFromInt(self.next())) / @as(f32, @floatFromInt(0x7fffffff));
-    }
-};
-
 pub const Canvas = struct {
     width: usize,
     height: usize,
@@ -37,13 +19,6 @@ pub const Canvas = struct {
 
     pub fn clear(self: *Canvas) void {
         clearCanvas(self);
-    }
-
-    pub fn translateToScreenSpace(canvas: *const Canvas, x: f32, y: f32) struct { x: i32, y: i32 } {
-        return .{
-            .x = @intFromFloat((x + 1) * 0.5 * @as(f32, @floatFromInt(canvas.width))),
-            .y = @intFromFloat((1 - y) * 0.5 * @as(f32, @floatFromInt(canvas.height))),
-        };
     }
 
     pub fn paintCircle(self: *Canvas, center: Point, radius: f32, stroke_width: f32) void {
@@ -85,6 +60,10 @@ pub const Canvas = struct {
     pub fn setPixel(canvas: *Canvas, x: i32, y: i32, color: Color) void {
         setPixelOnCanvas(canvas, x, y, color);
     }
+
+    fn translateToScreenSpace(canvas: *const Canvas, x: f32, y: f32) [2]i32 {
+        return translateToScreenSpaceOnCanvas(canvas, x, y);
+    }
 };
 
 fn initCanvas(allocator: std.mem.Allocator, width: usize, height: usize) !Canvas {
@@ -114,8 +93,8 @@ fn clearCanvas(canvas: *Canvas) void {
 
 fn paintCircleOnCanvas(canvas: *Canvas, center: Point, radius: f32, stroke_width: f32) void {
     const screen_position = canvas.translateToScreenSpace(center.position[0], center.position[1]);
-    const x0 = screen_position.x;
-    const y0 = screen_position.y;
+    const x0 = screen_position[0];
+    const y0 = screen_position[1];
     const r = radius * @as(f32, @floatFromInt(canvas.width)) * 0.5;
     const stroke = stroke_width * @as(f32, @floatFromInt(canvas.width)) * 0.5;
     const outer_radius_sq = (r + stroke * 0.5) * (r + stroke * 0.5);
@@ -143,19 +122,19 @@ fn drawLineOnCanvas(canvas: *Canvas, start: Point, end: Point, stroke_width: f32
     const end_screen = canvas.translateToScreenSpace(end.position[0], end.position[1]);
     const half_width: i32 = @intFromFloat(stroke_width * @as(f32, @floatFromInt(canvas.width)) * 0.25);
 
-    var x0 = start_screen.x;
-    var y0 = start_screen.y;
-    const dx: i32 = @intCast(@abs(end_screen.x - x0));
-    const dy: i32 = @intCast(@abs(end_screen.y - y0));
-    const sx: i32 = if (x0 < end_screen.x) 1 else -1;
-    const sy: i32 = if (y0 < end_screen.y) 1 else -1;
+    var x0 = start_screen[0];
+    var y0 = start_screen[1];
+    const dx: i32 = @intCast(@abs(end_screen[0] - x0));
+    const dy: i32 = @intCast(@abs(end_screen[1] - y0));
+    const sx: i32 = if (x0 < end_screen[0]) 1 else -1;
+    const sy: i32 = if (y0 < end_screen[1]) 1 else -1;
     var err = dx - dy;
 
     while (true) {
         // Draw a filled rectangle centered on the current pixel
         canvas.fillRect(x0 - half_width, y0 - half_width, x0 + half_width, y0 + half_width, color);
 
-        if (x0 == end_screen.x and y0 == end_screen.y) break;
+        if (x0 == end_screen[0] and y0 == end_screen[1]) break;
         const e2 = 2 * err;
         if (e2 > -dy) {
             err -= dy;
@@ -178,12 +157,12 @@ fn drawBezierCurveOnCanvas(canvas: *Canvas, start: Point, end: Point, control: P
 
     var t: f32 = 0;
     while (t <= 1.0) : (t += 1.0 / @as(f32, steps)) {
-        const x = @as(i32, @intFromFloat(std.math.pow(f32, 1 - t, 2) * @as(f32, @floatFromInt(start_screen.x)) +
-            2 * (1 - t) * t * @as(f32, @floatFromInt(control_screen.x)) +
-            std.math.pow(f32, t, 2) * @as(f32, @floatFromInt(end_screen.x))));
-        const y = @as(i32, @intFromFloat(std.math.pow(f32, 1 - t, 2) * @as(f32, @floatFromInt(start_screen.y)) +
-            2 * (1 - t) * t * @as(f32, @floatFromInt(control_screen.y)) +
-            std.math.pow(f32, t, 2) * @as(f32, @floatFromInt(end_screen.y))));
+        const x = @as(i32, @intFromFloat(std.math.pow(f32, 1 - t, 2) * @as(f32, @floatFromInt(start_screen[0])) +
+            2 * (1 - t) * t * @as(f32, @floatFromInt(control_screen[0])) +
+            std.math.pow(f32, t, 2) * @as(f32, @floatFromInt(end_screen[0]))));
+        const y = @as(i32, @intFromFloat(std.math.pow(f32, 1 - t, 2) * @as(f32, @floatFromInt(start_screen[1])) +
+            2 * (1 - t) * t * @as(f32, @floatFromInt(control_screen[1])) +
+            std.math.pow(f32, t, 2) * @as(f32, @floatFromInt(end_screen[1]))));
 
         // Draw a filled circle at each point for smooth, thick lines
         var dy: i32 = -half_width;
@@ -347,6 +326,24 @@ fn applyFastBlur(canvas: *Canvas, radius: usize) void {
     @memcpy(canvas.buffer, temp_buffer);
 }
 
+// Simple Linear Congruential Generator
+const LCG = struct {
+    state: u32,
+
+    pub fn init(seed: u32) LCG {
+        return LCG{ .state = seed };
+    }
+
+    pub fn next(self: *LCG) u32 {
+        self.state = (1103515245 * self.state + 12345) & 0x7fffffff;
+        return self.state;
+    }
+
+    pub fn nextFloat(self: *LCG) f32 {
+        return @as(f32, @floatFromInt(self.next())) / @as(f32, @floatFromInt(0x7fffffff));
+    }
+};
+
 fn applyFilmGrain(canvas: *Canvas, intensity: f32, seed: u32) void {
     var rng = LCG.init(seed);
     var y: usize = 0;
@@ -369,8 +366,6 @@ fn applyFilmGrain(canvas: *Canvas, intensity: f32, seed: u32) void {
         }
     }
 }
-
-// Helper functions like fillRect, setPixel, etc. would also be defined here
 
 fn fillRectOnCanvas(canvas: *Canvas, x1: i32, y1: i32, x2: i32, y2: i32, color: Color) void {
     const start_x = @max(0, @min(x1, x2));
@@ -403,4 +398,11 @@ fn setPixelOnCanvas(canvas: *Canvas, x: i32, y: i32, color: Color) void {
     canvas.buffer[index + 1] = rgba[1]; // G
     canvas.buffer[index + 2] = rgba[2]; // B
     canvas.buffer[index + 3] = rgba[3]; // A
+}
+
+fn translateToScreenSpaceOnCanvas(canvas: *const Canvas, x: f32, y: f32) [2]i32 {
+    return .{
+        @intFromFloat((x + 1) * 0.5 * @as(f32, @floatFromInt(canvas.width))),
+        @intFromFloat((1 - y) * 0.5 * @as(f32, @floatFromInt(canvas.height))),
+    };
 }
