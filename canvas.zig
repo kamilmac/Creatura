@@ -11,6 +11,8 @@ pub const Canvas = struct {
     clear_pattern: [32]u8,
     grain_buffer: []i16,
     grain_size: usize,
+    temp_buffer: []u8,
+    integral_buffer: [][4]u32,
 
     pub fn init(allocator: std.mem.Allocator, width: usize, height: usize) !Canvas {
         return initCanvas(allocator, width, height);
@@ -80,8 +82,11 @@ pub const Canvas = struct {
 
 fn initCanvas(allocator: std.mem.Allocator, width: usize, height: usize) !Canvas {
     const buffer = try allocator.alloc(u8, width * height * 4);
-    const grain_size = 256; // You can adjust this value
+    const grain_size = 2048; // You can adjust this value
     const grain_buffer = try allocator.alloc(i16, grain_size * grain_size);
+    const temp_buffer = try allocator.alloc(u8, width * height * 4);
+    const integral_buffer = try allocator.alloc([4]u32, (width + 1) * (height + 1));
+
     var canvas = Canvas{
         .width = width,
         .height = height,
@@ -90,6 +95,8 @@ fn initCanvas(allocator: std.mem.Allocator, width: usize, height: usize) !Canvas
         .clear_pattern = undefined,
         .grain_buffer = grain_buffer,
         .grain_size = grain_size,
+        .temp_buffer = temp_buffer,
+        .integral_buffer = integral_buffer,
     };
     try canvas.generateGrainPattern(12345);
     return canvas;
@@ -97,6 +104,9 @@ fn initCanvas(allocator: std.mem.Allocator, width: usize, height: usize) !Canvas
 
 fn deinitCanvas(canvas: *Canvas) void {
     canvas.allocator.free(canvas.buffer);
+    canvas.allocator.free(canvas.grain_buffer);
+    canvas.allocator.free(canvas.temp_buffer);
+    canvas.allocator.free(canvas.integral_buffer);
 }
 
 fn clearCanvas(canvas: *Canvas) void {
@@ -206,71 +216,83 @@ fn setClearColorForCanvas(canvas: *Canvas, color: Color) void {
     }
 }
 
-fn applyChromaticAberration(canvas: *Canvas, max_offset_x: i32, max_offset_y: i32) void {
-    const temp_buffer = canvas.allocator.alloc(u8, canvas.buffer.len) catch unreachable;
-    defer canvas.allocator.free(temp_buffer);
+fn applyChromaticAberration(self: *Canvas, max_offset_x: i32, max_offset_y: i32) void {
+    const temp_buffer = self.allocator.alloc(u8, self.buffer.len) catch unreachable;
+    defer self.allocator.free(temp_buffer);
+    @memcpy(temp_buffer, self.buffer);
 
-    @memcpy(temp_buffer, canvas.buffer);
+    const center_x = @as(f32, @floatFromInt(self.width)) / 2;
+    const center_y = @as(f32, @floatFromInt(self.height)) / 2;
+    const max_distance_sq = center_x * center_x + center_y * center_y;
+    const max_offset_x_f = @as(f32, @floatFromInt(max_offset_x));
+    const max_offset_y_f = @as(f32, @floatFromInt(max_offset_y));
 
-    const center_x = @as(f32, @floatFromInt(canvas.width)) / 2;
-    const center_y = @as(f32, @floatFromInt(canvas.height)) / 2;
-    const max_distance = @sqrt(center_x * center_x + center_y * center_y);
+    // Pre-compute intensity lookup table
+    var intensity_lut: [256]f32 = undefined;
+    for (&intensity_lut, 0..) |*intensity, i| {
+        intensity.* = @sqrt(@as(f32, @floatFromInt(i)) / 255.0);
+    }
+
+    // Downsample factor (adjust as needed)
+    const downsample = 8;
 
     var y: usize = 0;
-    while (y < canvas.height) : (y += 1) {
+    while (y < self.height) : (y += downsample) {
+        const dy = @as(f32, @floatFromInt(y)) - center_y;
+        const dy_sq = dy * dy;
         var x: usize = 0;
-        while (x < canvas.width) : (x += 1) {
+        while (x < self.width) : (x += downsample) {
             const dx = @as(f32, @floatFromInt(x)) - center_x;
-            const dy = @as(f32, @floatFromInt(y)) - center_y;
-            const distance = @sqrt(dx * dx + dy * dy);
-            const intensity = distance / max_distance;
+            const distance_sq = dx * dx + dy_sq;
+            const intensity_index = @as(usize, @intFromFloat((@min(distance_sq / max_distance_sq, 1.0)) * 255.0));
+            const intensity = intensity_lut[intensity_index];
+            const offset_x = @as(i32, @intFromFloat(max_offset_x_f * intensity));
+            const offset_y = @as(i32, @intFromFloat(max_offset_y_f * intensity));
 
-            const offset_x = @as(i32, @intFromFloat(@as(f32, @floatFromInt(max_offset_x)) * intensity));
-            const offset_y = @as(i32, @intFromFloat(@as(f32, @floatFromInt(max_offset_y)) * intensity));
+            // Apply effect to a block of pixels
+            var by: usize = 0;
+            while (by < downsample and y + by < self.height) : (by += 1) {
+                var bx: usize = 0;
+                while (bx < downsample and x + bx < self.width) : (bx += 1) {
+                    const index = ((y + by) * self.width + (x + bx)) * 4;
 
-            const index = (y * canvas.width + x) * 4;
+                    // Red channel
+                    const red_x = @as(i32, @intCast(x + bx)) + offset_x;
+                    const red_y = @as(i32, @intCast(y + by)) + offset_y;
+                    if (red_x >= 0 and red_x < @as(i32, @intCast(self.width)) and
+                        red_y >= 0 and red_y < @as(i32, @intCast(self.height)))
+                    {
+                        const red_index = (@as(usize, @intCast(red_y)) * self.width + @as(usize, @intCast(red_x))) * 4;
+                        self.buffer[index] = temp_buffer[red_index];
+                    }
 
-            // Red channel
-            const red_x = @as(i32, @intCast(x)) + offset_x;
-            const red_y = @as(i32, @intCast(y)) + offset_y;
-            if (red_x >= 0 and red_x < @as(i32, @intCast(canvas.width)) and
-                red_y >= 0 and red_y < @as(i32, @intCast(canvas.height)))
-            {
-                const red_index = (@as(usize, @intCast(red_y)) * canvas.width + @as(usize, @intCast(red_x))) * 4;
-                canvas.buffer[index] = temp_buffer[red_index];
+                    // Blue channel
+                    const blue_x = @as(i32, @intCast(x + bx)) - offset_x;
+                    const blue_y = @as(i32, @intCast(y + by)) - offset_y;
+                    if (blue_x >= 0 and blue_x < @as(i32, @intCast(self.width)) and
+                        blue_y >= 0 and blue_y < @as(i32, @intCast(self.height)))
+                    {
+                        const blue_index = (@as(usize, @intCast(blue_y)) * self.width + @as(usize, @intCast(blue_x))) * 4 + 2;
+                        self.buffer[index + 2] = temp_buffer[blue_index];
+                    }
+
+                    // Green channel and alpha remain unchanged
+                    self.buffer[index + 1] = temp_buffer[index + 1];
+                    self.buffer[index + 3] = temp_buffer[index + 3];
+                }
             }
-
-            // Blue channel
-            const blue_x = @as(i32, @intCast(x)) - offset_x;
-            const blue_y = @as(i32, @intCast(y)) - offset_y;
-            if (blue_x >= 0 and blue_x < @as(i32, @intCast(canvas.width)) and
-                blue_y >= 0 and blue_y < @as(i32, @intCast(canvas.height)))
-            {
-                const blue_index = (@as(usize, @intCast(blue_y)) * canvas.width + @as(usize, @intCast(blue_x))) * 4 + 2;
-                canvas.buffer[index + 2] = temp_buffer[blue_index];
-            }
-
-            // Green channel and alpha remain unchanged
-            canvas.buffer[index + 1] = temp_buffer[index + 1];
-            canvas.buffer[index + 3] = temp_buffer[index + 3];
         }
     }
 }
 
 fn applyFastBlur(canvas: *Canvas, radius: usize) void {
-    const temp_buffer = canvas.allocator.alloc(u8, canvas.buffer.len) catch unreachable;
-    defer canvas.allocator.free(temp_buffer);
-
-    const integral = canvas.allocator.alloc([4]u32, (canvas.width + 1) * (canvas.height + 1)) catch unreachable;
-    defer canvas.allocator.free(integral);
-
     // Calculate integral image
     var y: usize = 0;
     while (y <= canvas.height) : (y += 1) {
         var x: usize = 0;
         while (x <= canvas.width) : (x += 1) {
             if (x == 0 or y == 0) {
-                integral[y * (canvas.width + 1) + x] = .{ 0, 0, 0, 0 };
+                canvas.integral_buffer[y * (canvas.width + 1) + x] = .{ 0, 0, 0, 0 };
             } else {
                 const index = ((y - 1) * canvas.width + (x - 1)) * 4;
                 const current = @Vector(4, u32){
@@ -279,11 +301,11 @@ fn applyFastBlur(canvas: *Canvas, radius: usize) void {
                     canvas.buffer[index + 2],
                     canvas.buffer[index + 3],
                 };
-                const above = @Vector(4, u32){ integral[(y - 1) * (canvas.width + 1) + x][0], integral[(y - 1) * (canvas.width + 1) + x][1], integral[(y - 1) * (canvas.width + 1) + x][2], integral[(y - 1) * (canvas.width + 1) + x][3] };
-                const left = @Vector(4, u32){ integral[y * (canvas.width + 1) + (x - 1)][0], integral[y * (canvas.width + 1) + (x - 1)][1], integral[y * (canvas.width + 1) + (x - 1)][2], integral[y * (canvas.width + 1) + (x - 1)][3] };
-                const diagonal = @Vector(4, u32){ integral[(y - 1) * (canvas.width + 1) + (x - 1)][0], integral[(y - 1) * (canvas.width + 1) + (x - 1)][1], integral[(y - 1) * (canvas.width + 1) + (x - 1)][2], integral[(y - 1) * (canvas.width + 1) + (x - 1)][3] };
+                const above = @Vector(4, u32){ canvas.integral_buffer[(y - 1) * (canvas.width + 1) + x][0], canvas.integral_buffer[(y - 1) * (canvas.width + 1) + x][1], canvas.integral_buffer[(y - 1) * (canvas.width + 1) + x][2], canvas.integral_buffer[(y - 1) * (canvas.width + 1) + x][3] };
+                const left = @Vector(4, u32){ canvas.integral_buffer[y * (canvas.width + 1) + (x - 1)][0], canvas.integral_buffer[y * (canvas.width + 1) + (x - 1)][1], canvas.integral_buffer[y * (canvas.width + 1) + (x - 1)][2], canvas.integral_buffer[y * (canvas.width + 1) + (x - 1)][3] };
+                const diagonal = @Vector(4, u32){ canvas.integral_buffer[(y - 1) * (canvas.width + 1) + (x - 1)][0], canvas.integral_buffer[(y - 1) * (canvas.width + 1) + (x - 1)][1], canvas.integral_buffer[(y - 1) * (canvas.width + 1) + (x - 1)][2], canvas.integral_buffer[(y - 1) * (canvas.width + 1) + (x - 1)][3] };
                 const result = above + left - diagonal + current;
-                integral[y * (canvas.width + 1) + x] = .{ result[0], result[1], result[2], result[3] };
+                canvas.integral_buffer[y * (canvas.width + 1) + x] = .{ result[0], result[1], result[2], result[3] };
             }
         }
     }
@@ -300,19 +322,19 @@ fn applyFastBlur(canvas: *Canvas, radius: usize) void {
 
             const count = @as(u32, (x2 - x1 + 1) * (y2 - y1 + 1));
 
-            const sum = @Vector(4, u32){ integral[(y2 + 1) * (canvas.width + 1) + (x2 + 1)][0], integral[(y2 + 1) * (canvas.width + 1) + (x2 + 1)][1], integral[(y2 + 1) * (canvas.width + 1) + (x2 + 1)][2], integral[(y2 + 1) * (canvas.width + 1) + (x2 + 1)][3] } - @Vector(4, u32){ integral[(y1) * (canvas.width + 1) + (x2 + 1)][0], integral[(y1) * (canvas.width + 1) + (x2 + 1)][1], integral[(y1) * (canvas.width + 1) + (x2 + 1)][2], integral[(y1) * (canvas.width + 1) + (x2 + 1)][3] } - @Vector(4, u32){ integral[(y2 + 1) * (canvas.width + 1) + x1][0], integral[(y2 + 1) * (canvas.width + 1) + x1][1], integral[(y2 + 1) * (canvas.width + 1) + x1][2], integral[(y2 + 1) * (canvas.width + 1) + x1][3] } + @Vector(4, u32){ integral[y1 * (canvas.width + 1) + x1][0], integral[y1 * (canvas.width + 1) + x1][1], integral[y1 * (canvas.width + 1) + x1][2], integral[y1 * (canvas.width + 1) + x1][3] };
+            const sum = @Vector(4, u32){ canvas.integral_buffer[(y2 + 1) * (canvas.width + 1) + (x2 + 1)][0], canvas.integral_buffer[(y2 + 1) * (canvas.width + 1) + (x2 + 1)][1], canvas.integral_buffer[(y2 + 1) * (canvas.width + 1) + (x2 + 1)][2], canvas.integral_buffer[(y2 + 1) * (canvas.width + 1) + (x2 + 1)][3] } - @Vector(4, u32){ canvas.integral_buffer[(y1) * (canvas.width + 1) + (x2 + 1)][0], canvas.integral_buffer[(y1) * (canvas.width + 1) + (x2 + 1)][1], canvas.integral_buffer[(y1) * (canvas.width + 1) + (x2 + 1)][2], canvas.integral_buffer[(y1) * (canvas.width + 1) + (x2 + 1)][3] } - @Vector(4, u32){ canvas.integral_buffer[(y2 + 1) * (canvas.width + 1) + x1][0], canvas.integral_buffer[(y2 + 1) * (canvas.width + 1) + x1][1], canvas.integral_buffer[(y2 + 1) * (canvas.width + 1) + x1][2], canvas.integral_buffer[(y2 + 1) * (canvas.width + 1) + x1][3] } + @Vector(4, u32){ canvas.integral_buffer[y1 * (canvas.width + 1) + x1][0], canvas.integral_buffer[y1 * (canvas.width + 1) + x1][1], canvas.integral_buffer[y1 * (canvas.width + 1) + x1][2], canvas.integral_buffer[y1 * (canvas.width + 1) + x1][3] };
 
             const index = (y * canvas.width + x) * 4;
             const result = @divFloor(sum, @as(@Vector(4, u32), @splat(count)));
-            temp_buffer[index] = @intCast(result[0]);
-            temp_buffer[index + 1] = @intCast(result[1]);
-            temp_buffer[index + 2] = @intCast(result[2]);
-            temp_buffer[index + 3] = @intCast(result[3]);
+            canvas.temp_buffer[index] = @intCast(result[0]);
+            canvas.temp_buffer[index + 1] = @intCast(result[1]);
+            canvas.temp_buffer[index + 2] = @intCast(result[2]);
+            canvas.temp_buffer[index + 3] = @intCast(result[3]);
         }
     }
 
     // Copy result back to main buffer
-    @memcpy(canvas.buffer, temp_buffer);
+    @memcpy(canvas.buffer, canvas.temp_buffer);
 }
 
 // Simple Linear Congruential Generator
