@@ -1,11 +1,9 @@
 const std = @import("std");
-const Color = @import("color.zig").Color;
 
 pub const Point = struct {
     position: [2]f32,
     velocity: [2]f32,
     target: ?*Point,
-    color: Color,
     oscillation: struct {
         amplitude: [2]f32,
         frequency: [2]f32,
@@ -31,11 +29,6 @@ pub const Point = struct {
         return self;
     }
 
-    pub fn setColor(self: *Point, new_color: Color) *Point {
-        self.color = new_color;
-        return self;
-    }
-
     pub fn setOscillation(self: *Point, amplitude_x: f32, amplitude_y: f32, frequency_x: f32, frequency_y: f32) *Point {
         self.oscillation.amplitude = .{ amplitude_x, amplitude_y };
         self.oscillation.frequency = .{ frequency_x, frequency_y };
@@ -57,7 +50,6 @@ fn initPoint() Point {
         .position = .{ 0, 0 },
         .velocity = .{ 0, 0 },
         .target = null,
-        .color = .Black,
         .oscillation = .{
             .amplitude = .{ 0, 0 },
             .frequency = .{ 0, 0 },

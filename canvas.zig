@@ -27,8 +27,8 @@ pub const Canvas = struct {
         clearCanvas(self);
     }
 
-    pub fn paintCircle(self: *Canvas, center: Point, radius: f32, stroke_width: f32) void {
-        paintCircleOnCanvas(self, center, radius, stroke_width);
+    pub fn paintCircle(self: *Canvas, center: Point, radius: f32, stroke_width: f32, color: Color) void {
+        paintCircleOnCanvas(self, center, radius, stroke_width, color);
     }
 
     pub fn drawLine(self: *Canvas, start: Point, end: Point, stroke_width: f32, color: Color) void {
@@ -65,6 +65,10 @@ pub const Canvas = struct {
 
     pub fn setPixel(canvas: *Canvas, x: i32, y: i32, color: Color) void {
         setPixelOnCanvas(canvas, x, y, color);
+    }
+
+    pub fn applyLensDistortion(self: *Canvas, strength: f32) void {
+        applyLensDistortionOnCanvas(self, strength);
     }
 
     fn translateToScreenSpace(canvas: *const Canvas, x: f32, y: f32) [2]i32 {
@@ -123,7 +127,7 @@ fn clearCanvas(canvas: *Canvas) void {
     }
 }
 
-fn paintCircleOnCanvas(canvas: *Canvas, center: Point, radius: f32, stroke_width: f32) void {
+fn paintCircleOnCanvas(canvas: *Canvas, center: Point, radius: f32, stroke_width: f32, color: Color) void {
     const screen_position = canvas.translateToScreenSpace(center.position[0], center.position[1]);
     const x0 = screen_position[0];
     const y0 = screen_position[1];
@@ -140,7 +144,7 @@ fn paintCircleOnCanvas(canvas: *Canvas, center: Point, radius: f32, stroke_width
             const dy = y;
             const distance_sq = dx * dx + dy * dy;
             if (distance_sq <= outer_r * outer_r and distance_sq >= inner_r * inner_r) {
-                canvas.setPixel(x0 + x, y0 + y, center.color);
+                canvas.setPixel(x0 + x, y0 + y, color);
             }
         }
     }
@@ -429,4 +433,45 @@ fn translateToScreenSpaceOnCanvas(canvas: *const Canvas, x: f32, y: f32) [2]i32 
         @intFromFloat((x + 1) * 0.5 * @as(f32, @floatFromInt(canvas.width))),
         @intFromFloat((1 - y) * 0.5 * @as(f32, @floatFromInt(canvas.height))),
     };
+}
+
+fn applyLensDistortionOnCanvas(self: *Canvas, strength: f32) void {
+    const temp_buffer = self.allocator.alloc(u8, self.buffer.len) catch unreachable;
+    defer self.allocator.free(temp_buffer);
+    @memcpy(temp_buffer, self.buffer);
+
+    const center_x = @as(f32, @floatFromInt(self.width)) / 2.0;
+    const center_y = @as(f32, @floatFromInt(self.height)) / 2.0;
+    const max_distance = @sqrt(center_x * center_x + center_y * center_y);
+
+    var y: usize = 0;
+    while (y < self.height) : (y += 1) {
+        var x: usize = 0;
+        while (x < self.width) : (x += 1) {
+            const dx = @as(f32, @floatFromInt(x)) - center_x;
+            const dy = @as(f32, @floatFromInt(y)) - center_y;
+            const distance = @sqrt(dx * dx + dy * dy);
+            const normalized_distance = distance / max_distance;
+
+            // Calculate distortion factor with exponential falloff
+            const falloff = 30.0; // Adjust this to control the rate of falloff
+            const distortion_factor = 1.0 + (strength * std.math.exp(falloff * (normalized_distance - 1.0)));
+
+            // Apply distortion
+            const source_x = @as(i32, @intFromFloat(center_x + dx / distortion_factor));
+            const source_y = @as(i32, @intFromFloat(center_y + dy / distortion_factor));
+
+            if (source_x >= 0 and source_x < @as(i32, @intCast(self.width)) and
+                source_y >= 0 and source_y < @as(i32, @intCast(self.height)))
+            {
+                const dest_index = (y * self.width + x) * 4;
+                const source_index = (@as(usize, @intCast(source_y)) * self.width + @as(usize, @intCast(source_x))) * 4;
+
+                self.buffer[dest_index] = temp_buffer[source_index];
+                self.buffer[dest_index + 1] = temp_buffer[source_index + 1];
+                self.buffer[dest_index + 2] = temp_buffer[source_index + 2];
+                self.buffer[dest_index + 3] = temp_buffer[source_index + 3];
+            }
+        }
+    }
 }

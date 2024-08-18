@@ -57,22 +57,23 @@ export fn go() [*]const u8 {
     for (&points) |*point| {
         _ = point.update();
     }
-    canvas.paintCircle(points[0], 0.1, 0.01);
-    canvas.paintCircle(points[1], 0.1, 0.01);
-    canvas.paintCircle(points[2], 0.1, 0.01);
-    canvas.paintCircle(points[3], 0.3, @abs(points[0].position[1]) / 4 + 0.01);
+    canvas.paintCircle(points[0], 0.1, 0.01, .Black);
+    canvas.paintCircle(points[1], 0.1, 0.01, .Black);
+    canvas.paintCircle(points[2], 0.1, 0.01, .Black);
+    canvas.paintCircle(points[3], 0.3, @abs(points[0].position[1]) / 4 + 0.01, .Black);
 
-    canvas.paintCircle(points[4], 0.5, @abs(points[0].position[1]) / 4 + 0.01);
-    canvas.paintCircle(points[5], 0.37, @abs(points[1].position[1]) / 3 + 0.01);
-    canvas.paintCircle(points[6], 0.29, @abs(points[1].position[1]) / 4 + 0.01);
-    canvas.paintCircle(points[7], 0.22, @abs(points[0].position[1]) / 3 + 0.01);
+    canvas.paintCircle(points[4], 0.5, @abs(points[0].position[1]) / 4 + 0.01, .Black);
+    canvas.paintCircle(points[5], 0.37, @abs(points[1].position[1]) / 3 + 0.01, .Black);
+    canvas.paintCircle(points[6], 0.29, @abs(points[1].position[1]) / 4 + 0.01, .Black);
+    canvas.paintCircle(points[7], 0.22, @abs(points[0].position[1]) / 3 + 0.01, .Black);
 
-    canvas.drawBezierCurve(points[0], points[1], points[3], 0.012, points[0].color);
-    canvas.drawBezierCurve(points[1], points[2], points[3], 0.012, points[0].color);
-    canvas.drawBezierCurve(points[2], points[0], points[3], 0.012, points[0].color);
-    canvas.drawBezierCurve(points[0], points[1], points[3], 0.012, points[0].color);
+    canvas.drawBezierCurve(points[0], points[1], points[3], 0.012, .Black);
+    canvas.drawBezierCurve(points[1], points[2], points[3], 0.012, .Black);
+    canvas.drawBezierCurve(points[2], points[0], points[3], 0.012, .Black);
+    canvas.drawBezierCurve(points[0], points[1], points[3], 0.012, .Black);
     canvas.chromaticAberration(8, 8);
     canvas.fastBlur(1, 20);
+    // canvas.applyLensDistortion(1024);
     canvas.addFilmGrain(0.5);
     return canvas.getBufferPtr();
 }

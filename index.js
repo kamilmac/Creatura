@@ -174,13 +174,3 @@ loadZigWasmModule().then((wasmm) => {
   wasm = wasmm;
   main();
 });
-
-/**
-  Points
-    Point
-    Point
-    Point
-  Forces
-
-  
-**/
