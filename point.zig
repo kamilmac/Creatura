@@ -9,6 +9,11 @@ pub const Point = struct {
         frequency: [2]f32,
         offset: f32,
     },
+    rotation: struct {
+        speed: f32,
+        radius: f32,
+        angle: f32,
+    },
 
     pub fn init() Point {
         return initPoint();
@@ -40,6 +45,13 @@ pub const Point = struct {
         return self;
     }
 
+    pub fn addRotation(self: *Point, speed: f32, radius: f32) *Point {
+        self.rotation.speed = speed;
+        self.rotation.radius = radius;
+        self.rotation.angle = 0;
+        return self;
+    }
+
     fn oscillate(self: *Point) void {
         oscillatePoint(self);
     }
@@ -54,6 +66,11 @@ fn initPoint() Point {
             .amplitude = .{ 0, 0 },
             .frequency = .{ 0, 0 },
             .offset = 0,
+        },
+        .rotation = .{
+            .speed = 0,
+            .radius = 0,
+            .angle = 0,
         },
     };
 }
@@ -79,6 +96,14 @@ fn updatePoint(point: *Point) void {
     // Basic boundary check
     point.position[0] = @max(-1.0, @min(point.position[0], 1.0));
     point.position[1] = @max(-1.0, @min(point.position[1], 1.0));
+
+    if (point.rotation.radius > 0) {
+        point.rotation.angle += point.rotation.speed;
+        const rotation_x = point.rotation.radius * @cos(point.rotation.angle);
+        const rotation_y = point.rotation.radius * @sin(point.rotation.angle);
+        point.position[0] += rotation_x;
+        point.position[1] += rotation_y;
+    }
 }
 
 fn oscillatePoint(point: *Point) void {

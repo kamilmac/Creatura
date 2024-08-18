@@ -52,7 +52,8 @@ export fn init(width: usize, height: usize) void {
         .setOscillation(0.001, 0.001, 1.3, 0.3);
     _ = points[7]
         .setPosition(-0.6, -0.6)
-        .setOscillation(0.001, 0.001, 1.3, 0.3);
+        .addRotation(0.1, 0.02);
+    // .setOscillation(0.001, 0.001, 1.3, 0.3);
 }
 
 export fn go(mouseX: f32, mouseY: f32) [*]const u8 {
@@ -79,7 +80,7 @@ export fn go(mouseX: f32, mouseY: f32) [*]const u8 {
     canvas.drawBezierCurve(points[2], points[0], points[3], 0.012, .Black);
     canvas.drawBezierCurve(points[0], points[1], points[3], 0.012, .Black);
 
-    canvas.drawWigglyLine(points[0], points[1], 0.05, points[0].position[0] * 10, points[0].position[1] * 10, 0.01, .Black);
+    canvas.drawWigglyLine(points[7], points[1], 0.05, points[7].position[0] * 10, points[7].position[1] * 10, 0.01, .Black);
 
     canvas.fastBlur(1, 14);
     canvas.applyLensDistortion(256);

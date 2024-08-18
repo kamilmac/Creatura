@@ -89,8 +89,8 @@ pub const Canvas = struct {
         var prev_x = start.position[0];
         var prev_y = start.position[1];
 
-        var point1 = Point{ .position = .{ 0, 0 }, .velocity = .{ 0, 0 }, .target = null, .oscillation = .{ .amplitude = .{ 0, 0 }, .frequency = .{ 0, 0 }, .offset = 0 } };
-        var point2 = Point{ .position = .{ 0, 0 }, .velocity = .{ 0, 0 }, .target = null, .oscillation = .{ .amplitude = .{ 0, 0 }, .frequency = .{ 0, 0 }, .offset = 0 } };
+        var point1 = Point.init();
+        var point2 = Point.init();
 
         while (t <= 1.0) : ({
             t += step_size;
