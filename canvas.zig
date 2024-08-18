@@ -83,7 +83,7 @@ pub const Canvas = struct {
 
 fn initCanvas(allocator: std.mem.Allocator, width: usize, height: usize) !Canvas {
     const buffer = try allocator.alloc(u8, width * height * 4);
-    const grain_size = 2048; // You can adjust this value
+    const grain_size = 1024; // You can adjust this value
     const grain_buffer = try allocator.alloc(i16, grain_size * grain_size);
     const temp_buffer = try allocator.alloc(u8, width * height * 4);
     const integral_buffer = try allocator.alloc([4]u32, (width + 1) * (height + 1));
@@ -377,7 +377,7 @@ pub fn applyFilmGrain(self: *Canvas, intensity: f32) void {
     var y: usize = 0;
     while (y < self.height) : (y += 1) {
         var x: usize = 0;
-        while (x < self.width) : (x += 1) {
+        while (x < self.width) : (x += 4) {
             const index = (y * self.width + x) * 4;
             const grain_index = (y % self.grain_size) * self.grain_size + (x % self.grain_size);
             const noise = (self.grain_buffer[grain_index] * scaled_intensity) >> 8; // Fast division by 256

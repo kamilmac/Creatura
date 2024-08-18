@@ -71,9 +71,9 @@ export fn go() [*]const u8 {
     canvas.drawBezierCurve(points[1], points[2], points[3], 0.012, points[0].color);
     canvas.drawBezierCurve(points[2], points[0], points[3], 0.012, points[0].color);
     canvas.drawBezierCurve(points[0], points[1], points[3], 0.012, points[0].color);
-    // canvas.chromaticAberration(8, 8);
-    // canvas.fastBlur(1, 20);
-    // canvas.addFilmGrain(0.2);
+    canvas.chromaticAberration(8, 8);
+    canvas.fastBlur(1, 20);
+    canvas.addFilmGrain(0.5);
     return canvas.getBufferPtr();
 }
 
