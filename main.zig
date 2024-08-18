@@ -55,11 +55,14 @@ export fn init(width: usize, height: usize) void {
         .setOscillation(0.001, 0.001, 1.3, 0.3);
 }
 
-export fn go() [*]const u8 {
+export fn go(mouseX: f32, mouseY: f32) [*]const u8 {
     canvas.clear();
 
     for (&points) |*point| {
         _ = point.update();
+    }
+    if (mouseX != 0 and mouseY != 0) {
+        _ = points[0].setPosition(mouseX, mouseY);
     }
     canvas.paintCircle(points[0], 0.3, 0.01, .Black);
     canvas.paintCircle(points[1], 0.1, 0.4, .Black);
@@ -76,7 +79,7 @@ export fn go() [*]const u8 {
     canvas.drawBezierCurve(points[2], points[0], points[3], 0.012, .Black);
     canvas.drawBezierCurve(points[0], points[1], points[3], 0.012, .Black);
     canvas.fastBlur(1, 14);
-    canvas.applyLensDistortion(222);
+    canvas.applyLensDistortion(256);
     canvas.chromaticAberration(8, 8);
     canvas.addFilmGrain(0.5);
     return canvas.getBufferPtr();

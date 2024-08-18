@@ -1,9 +1,9 @@
 // Constants
-const CANVAS_HEIGHT = 512;
-const CANVAS_WIDTH = 512;
-const RENDER_SCALE = 2;
-const RENDER_WIDTH = CANVAS_WIDTH * RENDER_SCALE;
-const RENDER_HEIGHT = CANVAS_HEIGHT * RENDER_SCALE;
+const CANVAS_HEIGHT = 768;
+const CANVAS_WIDTH = 768;
+// const RENDER_SCALE = 2;
+const RENDER_WIDTH = 1024;
+const RENDER_HEIGHT = 1024;
 const FRAME_RATE = 24;
 const FRAME_DURATION = 1000 / FRAME_RATE;
 
@@ -11,6 +11,9 @@ const FRAME_DURATION = 1000 / FRAME_RATE;
 let gl;
 let texture;
 let wasm;
+
+let mouseX = 0;
+let mouseY = 0;
 
 // Shader sources
 const vertexShaderSource = `
@@ -91,6 +94,13 @@ function initWebGL() {
     return false;
   }
   texture = gl.createTexture();
+
+  canvas.addEventListener('mousemove', (event) => {
+    const rect = canvas.getBoundingClientRect();
+    mouseX = 2 * ((event.clientX - rect.left) / CANVAS_WIDTH - 0.5);
+    mouseY = -2 * (1 - (event.clientY - rect.top) / CANVAS_HEIGHT - 0.5); // Invert Y-axis
+  });
+
   return true;
 }
 
@@ -159,7 +169,7 @@ function animate(currentTime) {
   lastFrameTime = currentTime - (deltaTime % FRAME_DURATION);
 
   try {
-    const data = wasm.exports.go(currentTime);
+    const data = wasm.exports.go(mouseX, mouseY);
     const pixels = new Uint8Array(
       wasm.exports.memory.buffer,
       data, 
@@ -172,6 +182,10 @@ function animate(currentTime) {
   } catch (e) {
     console.warn(e);
   }
+}
+
+function addMouseListeners() {
+  window.addEventListener()  
 }
 
 function main() {
