@@ -71,6 +71,47 @@ pub const Canvas = struct {
         applyLensDistortionOnCanvas(self, strength);
     }
 
+    pub fn drawWigglyLine(self: *Canvas, start: Point, end: Point, amplitude: f32, frequency: f32, shift: f32, stroke_width: f32, color: Color) void {
+        const dx = end.position[0] - start.position[0];
+        const dy = end.position[1] - start.position[1];
+        const length = @sqrt(dx * dx + dy * dy);
+        const inv_length = 1.0 / length;
+
+        const perpendicular_x = -dy * inv_length;
+        const perpendicular_y = dx * inv_length;
+
+        const steps = 64;
+        const step_size = 1.0 / @as(f32, @floatFromInt(steps));
+        const angle_step = frequency * std.math.tau * step_size;
+
+        var t: f32 = 0;
+        var angle: f32 = shift * std.math.tau; // Initialize angle with shift
+        var prev_x = start.position[0];
+        var prev_y = start.position[1];
+
+        var point1 = Point{ .position = .{ 0, 0 }, .velocity = .{ 0, 0 }, .target = null, .oscillation = .{ .amplitude = .{ 0, 0 }, .frequency = .{ 0, 0 }, .offset = 0 } };
+        var point2 = Point{ .position = .{ 0, 0 }, .velocity = .{ 0, 0 }, .target = null, .oscillation = .{ .amplitude = .{ 0, 0 }, .frequency = .{ 0, 0 }, .offset = 0 } };
+
+        while (t <= 1.0) : ({
+            t += step_size;
+            angle += angle_step;
+        }) {
+            const x = start.position[0] + t * dx;
+            const y = start.position[1] + t * dy;
+
+            const wave_offset = amplitude * @sin(angle);
+            const wiggly_x = x + wave_offset * perpendicular_x;
+            const wiggly_y = y + wave_offset * perpendicular_y;
+
+            point1.position = .{ prev_x, prev_y };
+            point2.position = .{ wiggly_x, wiggly_y };
+            self.drawLine(point1, point2, stroke_width, color);
+
+            prev_x = wiggly_x;
+            prev_y = wiggly_y;
+        }
+    }
+
     fn translateToScreenSpace(canvas: *const Canvas, x: f32, y: f32) [2]i32 {
         return translateToScreenSpaceOnCanvas(canvas, x, y);
     }
