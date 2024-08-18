@@ -27,11 +27,11 @@ export fn init(width: usize, height: usize) void {
 
     _ = points[0]
         .setPosition(0.9, -0.9)
-        .setOscillation(0.04, 0.04, 2, 1)
+    // .setOscillation(0.04, 0.04, 2, 1)
         .setVelocity(-0.008, 0.004);
     _ = points[1]
         .setPosition(0.0, 0.0)
-        .setOscillation(0.04, 0.04, 2, 1)
+        .setOscillation(0.09, -0.04, 2, 2)
         .followPoint(&points[2]);
     _ = points[2]
         .setPosition(-0.5, 0.8)
@@ -57,9 +57,9 @@ export fn go() [*]const u8 {
     for (&points) |*point| {
         _ = point.update();
     }
-    canvas.paintCircle(points[0], 0.1, 0.01, .Black);
-    canvas.paintCircle(points[1], 0.1, 0.01, .Black);
-    canvas.paintCircle(points[2], 0.1, 0.01, .Black);
+    canvas.paintCircle(points[0], 0.3, 0.01, .Black);
+    canvas.paintCircle(points[1], 0.1, 0.4, .Black);
+    canvas.paintCircle(points[2], 0.3, 0.01, .Black);
     canvas.paintCircle(points[3], 0.3, @abs(points[0].position[1]) / 4 + 0.01, .Black);
 
     canvas.paintCircle(points[4], 0.5, @abs(points[0].position[1]) / 4 + 0.01, .Black);
@@ -71,9 +71,9 @@ export fn go() [*]const u8 {
     canvas.drawBezierCurve(points[1], points[2], points[3], 0.012, .Black);
     canvas.drawBezierCurve(points[2], points[0], points[3], 0.012, .Black);
     canvas.drawBezierCurve(points[0], points[1], points[3], 0.012, .Black);
-    canvas.chromaticAberration(8, 8);
     canvas.fastBlur(1, 20);
     // canvas.applyLensDistortion(1024);
+    canvas.chromaticAberration(8, 8);
     canvas.addFilmGrain(0.5);
     return canvas.getBufferPtr();
 }
