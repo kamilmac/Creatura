@@ -80,12 +80,12 @@ export fn go(mouseX: f32, mouseY: f32) [*]const u8 {
     canvas.drawBezierCurve(points[2], points[0], points[3], 0.012, .Black);
     canvas.drawBezierCurve(points[0], points[1], points[3], 0.012, .Black);
 
-    canvas.drawWigglyLine(points[7], points[1], 0.05, points[7].position[0] * 10, points[7].position[1] * 10, 0.01, .Black);
+    canvas.drawWigglyLine(points[7], points[1], 0.05, points[7].position[0] * 20, points[7].position[1] * 2, 0.01, .Black);
 
-    canvas.fastBlur(1, 14);
-    canvas.applyLensDistortion(256);
-    canvas.chromaticAberration(8, 8);
-    canvas.addFilmGrain(0.5);
+    canvas.fastBlur(1, 6, points[0]);
+    canvas.chromaticAberration(2, 2);
+    canvas.applyLensDistortion(384);
+    canvas.addFilmGrain(0.35);
     return canvas.getBufferPtr();
 }
 

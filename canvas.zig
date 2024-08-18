@@ -47,8 +47,8 @@ pub const Canvas = struct {
         applyChromaticAberration(self, max_offset_x, max_offset_y);
     }
 
-    pub fn fastBlur(self: *Canvas, min_radius: usize, max_radius: usize) void {
-        applyFastBlur(self, min_radius, max_radius);
+    pub fn fastBlur(self: *Canvas, min_radius: usize, max_radius: usize, center_point: Point) void {
+        applyFastBlur(self, min_radius, max_radius, center_point);
     }
 
     pub fn addFilmGrain(self: *Canvas, intensity: f32) void {
@@ -285,7 +285,7 @@ fn applyChromaticAberration(self: *Canvas, max_offset_x: i32, max_offset_y: i32)
     }
 
     // Downsample factor (adjust as needed)
-    const downsample = 8;
+    const downsample = 4;
 
     var y: usize = 0;
     while (y < self.height) : (y += downsample) {
@@ -336,12 +336,12 @@ fn applyChromaticAberration(self: *Canvas, max_offset_x: i32, max_offset_y: i32)
     }
 }
 
-fn applyFastBlur(canvas: *Canvas, min_radius: usize, max_radius: usize) void {
-    const center_x = @as(f32, @floatFromInt(canvas.width)) / 2;
-    const center_y = @as(f32, @floatFromInt(canvas.height)) / 2;
-    const max_distance = @sqrt(center_x * center_x + center_y * center_y);
+fn applyFastBlur(canvas: *Canvas, min_radius: usize, max_radius: usize, center_point: Point) void {
+    const center_x = (center_point.position[0] + 0.5) * @as(f32, @floatFromInt(canvas.width));
+    const center_y = (-center_point.position[1] + 0.5) * @as(f32, @floatFromInt(canvas.height));
+    const max_distance = @sqrt(@as(f32, @floatFromInt(canvas.width * canvas.width + canvas.height * canvas.height))) / 2;
 
-    // Calculate integral image
+    // Calculate integral image (unchanged)
     var y: usize = 0;
     while (y <= canvas.height) : (y += 1) {
         var x: usize = 0;
@@ -373,8 +373,10 @@ fn applyFastBlur(canvas: *Canvas, min_radius: usize, max_radius: usize) void {
             const dx = @as(f32, @floatFromInt(x)) - center_x;
             const dy = @as(f32, @floatFromInt(y)) - center_y;
             const distance = @sqrt(dx * dx + dy * dy);
-            const blur_factor = distance / max_distance;
-            const radius = @as(usize, @intFromFloat(@as(f32, @floatFromInt(min_radius)) + blur_factor * @as(f32, @floatFromInt(max_radius - min_radius))));
+
+            // Ensure min_radius at center, smoothly transitioning to max_radius
+            const blur_factor = std.math.pow(f32, @min(distance / max_distance, 1.0), 2);
+            const radius = min_radius + @as(usize, @intFromFloat(blur_factor * @as(f32, @floatFromInt(max_radius - min_radius))));
 
             const x1 = if (x >= radius) x - radius else 0;
             const y1 = if (y >= radius) y - radius else 0;
@@ -422,7 +424,7 @@ pub fn applyFilmGrain(self: *Canvas, intensity: f32) void {
     var y: usize = 0;
     while (y < self.height) : (y += 1) {
         var x: usize = 0;
-        while (x < self.width) : (x += 4) {
+        while (x < self.width) : (x += 3) {
             const index = (y * self.width + x) * 4;
             const grain_index = (y % self.grain_size) * self.grain_size + (x % self.grain_size);
             const noise = (self.grain_buffer[grain_index] * scaled_intensity) >> 8; // Fast division by 256

@@ -1,9 +1,9 @@
 // Constants
-const CANVAS_HEIGHT = 768;
-const CANVAS_WIDTH = 768;
+const CANVAS_HEIGHT = 600;
+const CANVAS_WIDTH = 600;
 // const RENDER_SCALE = 2;
-const RENDER_WIDTH = 1024;
-const RENDER_HEIGHT = 1024;
+const RENDER_WIDTH = 512;
+const RENDER_HEIGHT = 512;
 const FRAME_RATE = 24;
 const FRAME_DURATION = 1000 / FRAME_RATE;
 
