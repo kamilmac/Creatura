@@ -127,22 +127,19 @@ fn paintCircleOnCanvas(canvas: *Canvas, center: Point, radius: f32, stroke_width
     const screen_position = canvas.translateToScreenSpace(center.position[0], center.position[1]);
     const x0 = screen_position[0];
     const y0 = screen_position[1];
-    const r = radius * @as(f32, @floatFromInt(canvas.width)) * 0.5;
-    const stroke = stroke_width * @as(f32, @floatFromInt(canvas.width)) * 0.5;
-    const outer_radius_sq = (r + stroke * 0.5) * (r + stroke * 0.5);
-    const inner_radius_sq = (r - stroke * 0.5) * (r - stroke * 0.5);
+    const r = @as(i32, @intFromFloat(radius * @as(f32, @floatFromInt(canvas.width)) * 0.5));
+    const stroke = @as(i32, @intFromFloat(stroke_width * @as(f32, @floatFromInt(canvas.width)) * 0.5));
+    const outer_r = r + @divTrunc(stroke, 2);
+    const inner_r = r - @divTrunc(stroke, 2);
 
-    const bounding_box: i32 = @intFromFloat(r + stroke * 0.5 + 1);
-
-    var y: i32 = -bounding_box;
-    while (y <= bounding_box) : (y += 1) {
-        var x: i32 = -bounding_box;
-        while (x <= bounding_box) : (x += 1) {
-            const dx: f32 = @floatFromInt(x);
-            const dy: f32 = @floatFromInt(y);
+    var y: i32 = -outer_r;
+    while (y <= outer_r) : (y += 1) {
+        var x: i32 = -outer_r;
+        while (x <= outer_r) : (x += 1) {
+            const dx = x;
+            const dy = y;
             const distance_sq = dx * dx + dy * dy;
-
-            if (distance_sq <= outer_radius_sq and distance_sq >= inner_radius_sq) {
+            if (distance_sq <= outer_r * outer_r and distance_sq >= inner_r * inner_r) {
                 canvas.setPixel(x0 + x, y0 + y, center.color);
             }
         }
@@ -184,24 +181,31 @@ fn drawBezierCurveOnCanvas(canvas: *Canvas, start: Point, end: Point, control: P
     const end_screen = canvas.translateToScreenSpace(end.position[0], end.position[1]);
     const control_screen = canvas.translateToScreenSpace(control.position[0], control.position[1]);
 
-    const steps = 1000; // Increase for smoother curve
+    const steps: f32 = 12 / stroke_width;
+    const step_size = 1.0 / steps;
     const half_width = @as(i32, @intFromFloat(stroke_width * @as(f32, @floatFromInt(canvas.width)) * 0.25));
+    const half_width_sq = half_width * half_width;
+
+    // Pre-compute constants for the quadratic Bezier formula
+    const ax = @as(f32, @floatFromInt(start_screen[0] - 2 * control_screen[0] + end_screen[0]));
+    const ay = @as(f32, @floatFromInt(start_screen[1] - 2 * control_screen[1] + end_screen[1]));
+    const bx = @as(f32, @floatFromInt(2 * (control_screen[0] - start_screen[0])));
+    const by = @as(f32, @floatFromInt(2 * (control_screen[1] - start_screen[1])));
+    const start_x = @as(f32, @floatFromInt(start_screen[0]));
+    const start_y = @as(f32, @floatFromInt(start_screen[1]));
 
     var t: f32 = 0;
-    while (t <= 1.0) : (t += 1.0 / @as(f32, steps)) {
-        const x = @as(i32, @intFromFloat(std.math.pow(f32, 1 - t, 2) * @as(f32, @floatFromInt(start_screen[0])) +
-            2 * (1 - t) * t * @as(f32, @floatFromInt(control_screen[0])) +
-            std.math.pow(f32, t, 2) * @as(f32, @floatFromInt(end_screen[0]))));
-        const y = @as(i32, @intFromFloat(std.math.pow(f32, 1 - t, 2) * @as(f32, @floatFromInt(start_screen[1])) +
-            2 * (1 - t) * t * @as(f32, @floatFromInt(control_screen[1])) +
-            std.math.pow(f32, t, 2) * @as(f32, @floatFromInt(end_screen[1]))));
+    while (t <= 1.0) : (t += step_size) {
+        const t2 = t * t;
+        const x = @as(i32, @intFromFloat(ax * t2 + bx * t + start_x));
+        const y = @as(i32, @intFromFloat(ay * t2 + by * t + start_y));
 
-        // Draw a filled circle at each point for smooth, thick lines
+        // Use a more efficient nested loop for drawing filled circles
         var dy: i32 = -half_width;
         while (dy <= half_width) : (dy += 1) {
             var dx: i32 = -half_width;
             while (dx <= half_width) : (dx += 1) {
-                if (dx * dx + dy * dy <= half_width * half_width) {
+                if (dx * dx + dy * dy <= half_width_sq) {
                     canvas.setPixel(x + dx, y + dy, color);
                 }
             }
