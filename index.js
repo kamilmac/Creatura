@@ -1,9 +1,38 @@
+// Constants
 const CANVAS_HEIGHT = 512;
 const CANVAS_WIDTH = 512;
 const RENDER_SCALE = 2;
 const RENDER_WIDTH = CANVAS_WIDTH * RENDER_SCALE;
 const RENDER_HEIGHT = CANVAS_HEIGHT * RENDER_SCALE;
+const FRAME_RATE = 24;
+const FRAME_DURATION = 1000 / FRAME_RATE;
 
+// WebGL variables
+let gl;
+let texture;
+let wasm;
+
+// Shader sources
+const vertexShaderSource = `
+  attribute vec4 a_position;
+  attribute vec2 a_texCoord;
+  varying vec2 v_texCoord;
+  void main() {
+    gl_Position = a_position;
+    v_texCoord = a_texCoord;
+  }
+`;
+
+const fragmentShaderSource = `
+  precision mediump float;
+  varying vec2 v_texCoord;
+  uniform sampler2D u_texture;
+  void main() {
+    gl_FragColor = texture2D(u_texture, v_texCoord);
+  }
+`;
+
+// Helper functions
 function createCanvas(parentDivId, canvasWidth, canvasHeight) {
   const parentDiv = document.getElementById(parentDivId);
   const canvas = document.createElement('canvas');
@@ -11,31 +40,7 @@ function createCanvas(parentDivId, canvasWidth, canvasHeight) {
   canvas.height = canvasHeight;
   parentDiv.appendChild(canvas);
   return canvas;
-};
-
-const canvas = createCanvas('root', CANVAS_WIDTH, CANVAS_HEIGHT);
-const gl = canvas.getContext('webgl');
-const texture = gl.createTexture();
-let wasm = undefined;
-
-const vertexShaderSource = `
-attribute vec4 a_position;
-attribute vec2 a_texCoord;
-varying vec2 v_texCoord;
-void main() {
-  gl_Position = a_position;
-  v_texCoord = a_texCoord;
 }
-`;
-
-const fragmentShaderSource = `
-precision mediump float;
-varying vec2 v_texCoord;
-uniform sampler2D u_texture;
-void main() {
-  gl_FragColor = texture2D(u_texture, v_texCoord);
-}
-`;
 
 function createShader(gl, type, source) {
   const shader = gl.createShader(type);
@@ -77,100 +82,116 @@ async function loadZigWasmModule() {
   return instance;
 }
 
-function main() {
+// Main application logic
+function initWebGL() {
+  const canvas = createCanvas('root', CANVAS_WIDTH, CANVAS_HEIGHT);
+  gl = canvas.getContext('webgl');
   if (!gl) {
     console.error('WebGL not supported');
-    return;
+    return false;
   }
+  texture = gl.createTexture();
+  return true;
+}
 
+function setupShaders() {
   const vertexShader = createShader(gl, gl.VERTEX_SHADER, vertexShaderSource);
   const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fragmentShaderSource);
-  const program = createProgram(gl, vertexShader, fragmentShader);
+  return createProgram(gl, vertexShader, fragmentShader);
+}
 
+function setupBuffers() {
   const positionBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
   const positions = new Float32Array([
-    -1, -1,
-     1, -1,
-    -1,  1,
-    -1,  1,
-     1, -1,
-     1,  1,
+    -1, -1, 1, -1, -1, 1,
+    -1, 1, 1, -1, 1, 1,
   ]);
   gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
 
   const texCoordBuffer = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
   const texCoords = new Float32Array([
-    0, 0,
-    1, 0,
-    0, 1,
-    0, 1,
-    1, 0,
-    1, 1,
+    0, 0, 1, 0, 0, 1,
+    0, 1, 1, 0, 1, 1,
   ]);
   gl.bufferData(gl.ARRAY_BUFFER, texCoords, gl.STATIC_DRAW);
+
+  return { positionBuffer, texCoordBuffer };
+}
+
+function setupTexture() {
   gl.bindTexture(gl.TEXTURE_2D, texture);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, RENDER_WIDTH, RENDER_HEIGHT, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-  
-  // Rest of the code continues from here
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+}
 
-  gl.useProgram(program);
-
+function setupAttributes(program, buffers) {
   const positionLocation = gl.getAttribLocation(program, 'a_position');
   gl.enableVertexAttribArray(positionLocation);
-  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffers.positionBuffer);
   gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
 
   const texCoordLocation = gl.getAttribLocation(program, 'a_texCoord');
   gl.enableVertexAttribArray(texCoordLocation);
-  gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+  gl.bindBuffer(gl.ARRAY_BUFFER, buffers.texCoordBuffer);
   gl.vertexAttribPointer(texCoordLocation, 2, gl.FLOAT, false, 0, 0);
 
   const textureLocation = gl.getUniformLocation(program, 'u_texture');
   gl.uniform1i(textureLocation, 0);
-
-  wasm.exports.init(RENDER_WIDTH, RENDER_HEIGHT);
-
-  const FRAME_RATE = 24;
-  const FRAME_DURATION = 1000 / FRAME_RATE;
-  let lastFrameTime = 0;
-
-  function animate(timeSinceStart) {
-    // if (timeSinceStart > 80000) {
-    //   return;
-    // }
-    try {
-      const deltaTime = timeSinceStart - lastFrameTime;
-      if (deltaTime < FRAME_DURATION) {
-        window.requestAnimationFrame(animate);
-        return;
-      }
-      lastFrameTime = timeSinceStart;
-      const data = wasm.exports.go(timeSinceStart);
-      const pixels = new Uint8Array(
-        wasm.exports.memory.buffer,
-        data, 
-        RENDER_WIDTH * RENDER_HEIGHT * 4,
-      )
-
-      gl.bindTexture(gl.TEXTURE_2D, texture);
-      // gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, RENDER_WIDTH, RENDER_HEIGHT, 0, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, RENDER_WIDTH, RENDER_HEIGHT, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-      gl.drawArrays(gl.TRIANGLES, 0, 6);
-      console.log({wasm, data, pixels })
-    } catch (e) {
-      console.warn(e)
-    }
-    window.requestAnimationFrame(animate);
-  }
-
-  animate();
 }
 
-loadZigWasmModule().then((wasmm) => {
-  wasm = wasmm;
+let lastFrameTime = 0;
+
+function animate(currentTime) {
+  requestAnimationFrame(animate);
+
+  // Calculate time since last frame
+  const deltaTime = currentTime - lastFrameTime;
+
+  // If not enough time has passed, skip this frame
+  if (deltaTime < FRAME_DURATION) {
+    return;
+  }
+
+  // Update lastFrameTime for the next frame
+  lastFrameTime = currentTime - (deltaTime % FRAME_DURATION);
+
+  try {
+    const data = wasm.exports.go(currentTime);
+    const pixels = new Uint8Array(
+      wasm.exports.memory.buffer,
+      data, 
+      RENDER_WIDTH * RENDER_HEIGHT * 4
+    );
+
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, RENDER_WIDTH, RENDER_HEIGHT, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+  } catch (e) {
+    console.warn(e);
+  }
+}
+
+function main() {
+  if (!initWebGL()) return;
+
+  const program = setupShaders();
+  const buffers = setupBuffers();
+  setupTexture();
+  setupAttributes(program, buffers);
+
+  gl.useProgram(program);
+  wasm.exports.init(RENDER_WIDTH, RENDER_HEIGHT);
+
+  // Initialize lastFrameTime before starting the animation
+  lastFrameTime = performance.now();
+  requestAnimationFrame(animate);
+}
+
+// Initialize the application
+loadZigWasmModule().then((wasmModule) => {
+  wasm = wasmModule;
   main();
 });

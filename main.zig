@@ -42,13 +42,17 @@ export fn init(width: usize, height: usize) void {
         .setVelocity(-0.008, -0.008);
 
     _ = points[4]
-        .setPosition(-0.6, 0.6);
+        .setPosition(-0.6, 0.6)
+        .setOscillation(0.001, 0.001, 1.3, 0.3);
     _ = points[5]
-        .setPosition(0.6, 0.6);
+        .setPosition(0.6, 0.6)
+        .setOscillation(0.001, 0.001, 1.3, 0.3);
     _ = points[6]
-        .setPosition(0.6, -0.6);
+        .setPosition(0.6, -0.6)
+        .setOscillation(0.001, 0.001, 1.3, 0.3);
     _ = points[7]
-        .setPosition(-0.6, -0.6);
+        .setPosition(-0.6, -0.6)
+        .setOscillation(0.001, 0.001, 1.3, 0.3);
 }
 
 export fn go() [*]const u8 {
@@ -71,8 +75,8 @@ export fn go() [*]const u8 {
     canvas.drawBezierCurve(points[1], points[2], points[3], 0.012, .Black);
     canvas.drawBezierCurve(points[2], points[0], points[3], 0.012, .Black);
     canvas.drawBezierCurve(points[0], points[1], points[3], 0.012, .Black);
-    canvas.fastBlur(1, 20);
-    // canvas.applyLensDistortion(1024);
+    canvas.fastBlur(1, 14);
+    canvas.applyLensDistortion(222);
     canvas.chromaticAberration(8, 8);
     canvas.addFilmGrain(0.5);
     return canvas.getBufferPtr();
