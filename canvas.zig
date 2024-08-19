@@ -72,103 +72,11 @@ pub const Canvas = struct {
     }
 
     pub fn drawWigglyLine(self: *Canvas, start: Point, end: Point, amplitude: f32, frequency: f32, shift: f32, stroke_width: f32, color: Color) void {
-        const dx = end.position[0] - start.position[0];
-        const dy = end.position[1] - start.position[1];
-        const length = @sqrt(dx * dx + dy * dy);
-        const inv_length = 1.0 / length;
-
-        const perpendicular_x = -dy * inv_length;
-        const perpendicular_y = dx * inv_length;
-
-        const steps = 96;
-        const step_size = 1.0 / @as(f32, @floatFromInt(steps));
-        const angle_step = frequency * std.math.tau * step_size;
-
-        var t: f32 = 0;
-        var angle: f32 = shift * std.math.tau; // Initialize angle with shift
-        var prev_x = start.position[0];
-        var prev_y = start.position[1];
-
-        var point1 = Point.init();
-        var point2 = Point.init();
-
-        while (t <= 1.0) : ({
-            t += step_size;
-            angle += angle_step;
-        }) {
-            const x = start.position[0] + t * dx;
-            const y = start.position[1] + t * dy;
-
-            const wave_offset = amplitude * @sin(angle);
-            const wiggly_x = x + wave_offset * perpendicular_x;
-            const wiggly_y = y + wave_offset * perpendicular_y;
-
-            point1.position = .{ prev_x, prev_y };
-            point2.position = .{ wiggly_x, wiggly_y };
-            self.drawLine(point1, point2, stroke_width, color);
-
-            prev_x = wiggly_x;
-            prev_y = wiggly_y;
-        }
+        drawWigglyLineOnCanvas(self, start, end, amplitude, frequency, shift, stroke_width, color);
     }
 
     pub fn renderWetSpot(self: *Canvas, center: Point, radius: f32, color: Color) void {
-        const screen_pos = self.translateToScreenSpace(center.position[0], center.position[1]);
-        const x0 = screen_pos[0];
-        const y0 = screen_pos[1];
-        const r = @as(i32, @intFromFloat(radius * @as(f32, @floatFromInt(self.width)) * 0.5));
-
-        // Calculate bounds
-        const left = @max(0, x0 - r);
-        const right = @min(@as(i32, @intCast(self.width)) - 1, x0 + r);
-        const top = @max(0, y0 - r);
-        const bottom = @min(@as(i32, @intCast(self.height)) - 1, y0 + r);
-
-        // If the spot is completely outside the canvas, return early
-        if (left > right or top > bottom) {
-            return;
-        }
-
-        const spot_color = color.toRGBA();
-        const max_alpha = spot_color[3];
-
-        var prng = std.rand.DefaultPrng.init(0); // You can use a different seed for variety
-        const random = prng.random();
-
-        var y: i32 = top;
-        while (y <= bottom) : (y += 1) {
-            var x: i32 = left;
-            while (x <= right) : (x += 1) {
-                const dx = x - x0;
-                const dy = y - y0;
-                const distance_sq = dx * dx + dy * dy;
-                if (distance_sq <= r * r) {
-                    const distance = @sqrt(@as(f32, @floatFromInt(distance_sq)));
-                    const normalized_distance = distance / @as(f32, @floatFromInt(r));
-
-                    // Create irregular edge
-                    const noise = (random.float(f32) - 0.5) * 0.3;
-                    const edge_factor = normalized_distance + noise;
-
-                    if (edge_factor < 1.0) {
-                        // Soften the edge and create more irregular shape
-                        const alpha_factor = std.math.pow(f32, 1.0 - edge_factor, 3.0);
-                        const alpha = @as(u8, @intFromFloat(@as(f32, @floatFromInt(max_alpha)) * alpha_factor));
-
-                        const index = (@as(usize, @intCast(y)) * self.width + @as(usize, @intCast(x))) * 4;
-                        self.buffer[index] = blendColor(self.buffer[index], spot_color[0], alpha);
-                        self.buffer[index + 1] = blendColor(self.buffer[index + 1], spot_color[1], alpha);
-                        self.buffer[index + 2] = blendColor(self.buffer[index + 2], spot_color[2], alpha);
-                    }
-                }
-            }
-        }
-    }
-
-    fn blendColor(bg: u8, fg: u8, alpha: u8) u8 {
-        const fg_component = @as(u16, fg) * @as(u16, alpha);
-        const bg_component = @as(u16, bg) * (255 - @as(u16, alpha));
-        return @intCast((fg_component + bg_component) / 255);
+        renderWetSpotOnCanvas(self, center, radius, color);
     }
 
     fn translateToScreenSpace(canvas: *const Canvas, x: f32, y: f32) [2]i32 {
@@ -328,11 +236,11 @@ fn setClearColorForCanvas(canvas: *Canvas, color: Color) void {
     }
 }
 
-fn applyChromaticAberration(self: *Canvas, max_offset_x: i32, max_offset_y: i32) void {
-    @memcpy(self.chromatic_buffer, self.buffer);
+fn applyChromaticAberration(canvas: *Canvas, max_offset_x: i32, max_offset_y: i32) void {
+    @memcpy(canvas.chromatic_buffer, canvas.buffer);
 
-    const center_x = @as(f32, @floatFromInt(self.width)) / 2;
-    const center_y = @as(f32, @floatFromInt(self.height)) / 2;
+    const center_x = @as(f32, @floatFromInt(canvas.width)) / 2;
+    const center_y = @as(f32, @floatFromInt(canvas.height)) / 2;
     const max_distance_sq = center_x * center_x + center_y * center_y;
     const max_offset_x_f = @as(f32, @floatFromInt(max_offset_x));
     const max_offset_y_f = @as(f32, @floatFromInt(max_offset_y));
@@ -347,11 +255,11 @@ fn applyChromaticAberration(self: *Canvas, max_offset_x: i32, max_offset_y: i32)
     const downsample = 4;
 
     var y: usize = 0;
-    while (y < self.height) : (y += downsample) {
+    while (y < canvas.height) : (y += downsample) {
         const dy = @as(f32, @floatFromInt(y)) - center_y;
         const dy_sq = dy * dy;
         var x: usize = 0;
-        while (x < self.width) : (x += downsample) {
+        while (x < canvas.width) : (x += downsample) {
             const dx = @as(f32, @floatFromInt(x)) - center_x;
             const distance_sq = dx * dx + dy_sq;
             const intensity_index = @as(usize, @intFromFloat((@min(distance_sq / max_distance_sq, 1.0)) * 255.0));
@@ -361,34 +269,34 @@ fn applyChromaticAberration(self: *Canvas, max_offset_x: i32, max_offset_y: i32)
 
             // Apply effect to a block of pixels
             var by: usize = 0;
-            while (by < downsample and y + by < self.height) : (by += 1) {
+            while (by < downsample and y + by < canvas.height) : (by += 1) {
                 var bx: usize = 0;
-                while (bx < downsample and x + bx < self.width) : (bx += 1) {
-                    const index = ((y + by) * self.width + (x + bx)) * 4;
+                while (bx < downsample and x + bx < canvas.width) : (bx += 1) {
+                    const index = ((y + by) * canvas.width + (x + bx)) * 4;
 
                     // Red channel
                     const red_x = @as(i32, @intCast(x + bx)) + offset_x;
                     const red_y = @as(i32, @intCast(y + by)) + offset_y;
-                    if (red_x >= 0 and red_x < @as(i32, @intCast(self.width)) and
-                        red_y >= 0 and red_y < @as(i32, @intCast(self.height)))
+                    if (red_x >= 0 and red_x < @as(i32, @intCast(canvas.width)) and
+                        red_y >= 0 and red_y < @as(i32, @intCast(canvas.height)))
                     {
-                        const red_index = (@as(usize, @intCast(red_y)) * self.width + @as(usize, @intCast(red_x))) * 4;
-                        self.buffer[index] = self.chromatic_buffer[red_index];
+                        const red_index = (@as(usize, @intCast(red_y)) * canvas.width + @as(usize, @intCast(red_x))) * 4;
+                        canvas.buffer[index] = canvas.chromatic_buffer[red_index];
                     }
 
                     // Blue channel
                     const blue_x = @as(i32, @intCast(x + bx)) - offset_x;
                     const blue_y = @as(i32, @intCast(y + by)) - offset_y;
-                    if (blue_x >= 0 and blue_x < @as(i32, @intCast(self.width)) and
-                        blue_y >= 0 and blue_y < @as(i32, @intCast(self.height)))
+                    if (blue_x >= 0 and blue_x < @as(i32, @intCast(canvas.width)) and
+                        blue_y >= 0 and blue_y < @as(i32, @intCast(canvas.height)))
                     {
-                        const blue_index = (@as(usize, @intCast(blue_y)) * self.width + @as(usize, @intCast(blue_x))) * 4 + 2;
-                        self.buffer[index + 2] = self.chromatic_buffer[blue_index];
+                        const blue_index = (@as(usize, @intCast(blue_y)) * canvas.width + @as(usize, @intCast(blue_x))) * 4 + 2;
+                        canvas.buffer[index + 2] = canvas.chromatic_buffer[blue_index];
                     }
 
                     // Green channel and alpha remain unchanged
-                    self.buffer[index + 1] = self.chromatic_buffer[index + 1];
-                    self.buffer[index + 3] = self.chromatic_buffer[index + 3];
+                    canvas.buffer[index + 1] = canvas.chromatic_buffer[index + 1];
+                    canvas.buffer[index + 3] = canvas.chromatic_buffer[index + 3];
                 }
             }
         }
@@ -475,21 +383,21 @@ const LCG = struct {
     }
 };
 
-pub fn applyFilmGrain(self: *Canvas, intensity: f32) void {
+pub fn applyFilmGrain(canvas: *Canvas, intensity: f32) void {
     const scaled_intensity = @as(i32, @intFromFloat(intensity * 256)); // Pre-compute scaled intensity
 
     var y: usize = 0;
-    while (y < self.height) : (y += 1) {
+    while (y < canvas.height) : (y += 1) {
         var x: usize = 0;
-        while (x < self.width) : (x += 3) {
-            const index = (y * self.width + x) * 4;
-            const grain_index = (y % self.grain_size) * self.grain_size + (x % self.grain_size);
-            const noise = (self.grain_buffer[grain_index] * scaled_intensity) >> 8; // Fast division by 256
+        while (x < canvas.width) : (x += 3) {
+            const index = (y * canvas.width + x) * 4;
+            const grain_index = (y % canvas.grain_size) * canvas.grain_size + (x % canvas.grain_size);
+            const noise = (canvas.grain_buffer[grain_index] * scaled_intensity) >> 8; // Fast division by 256
 
             inline for (0..3) |i| {
-                const pixel_value = @as(i32, self.buffer[index + i]);
+                const pixel_value = @as(i32, canvas.buffer[index + i]);
                 const new_value = @as(u8, @intCast(@min(255, @max(0, pixel_value + noise))));
-                self.buffer[index + i] = new_value;
+                canvas.buffer[index + i] = new_value;
             }
         }
     }
@@ -535,19 +443,19 @@ fn translateToScreenSpaceOnCanvas(canvas: *const Canvas, x: f32, y: f32) [2]i32 
     };
 }
 
-fn applyLensDistortionOnCanvas(self: *Canvas, strength: f32) void {
-    const temp_buffer = self.allocator.alloc(u8, self.buffer.len) catch unreachable;
-    defer self.allocator.free(temp_buffer);
-    @memcpy(temp_buffer, self.buffer);
+fn applyLensDistortionOnCanvas(canvas: *Canvas, strength: f32) void {
+    const temp_buffer = canvas.allocator.alloc(u8, canvas.buffer.len) catch unreachable;
+    defer canvas.allocator.free(temp_buffer);
+    @memcpy(temp_buffer, canvas.buffer);
 
-    const center_x = @as(f32, @floatFromInt(self.width)) / 2.0;
-    const center_y = @as(f32, @floatFromInt(self.height)) / 2.0;
+    const center_x = @as(f32, @floatFromInt(canvas.width)) / 2.0;
+    const center_y = @as(f32, @floatFromInt(canvas.height)) / 2.0;
     const max_distance = @sqrt(center_x * center_x + center_y * center_y);
 
     var y: usize = 0;
-    while (y < self.height) : (y += 1) {
+    while (y < canvas.height) : (y += 1) {
         var x: usize = 0;
-        while (x < self.width) : (x += 1) {
+        while (x < canvas.width) : (x += 1) {
             const dx = @as(f32, @floatFromInt(x)) - center_x;
             const dy = @as(f32, @floatFromInt(y)) - center_y;
             const distance = @sqrt(dx * dx + dy * dy);
@@ -561,17 +469,117 @@ fn applyLensDistortionOnCanvas(self: *Canvas, strength: f32) void {
             const source_x = @as(i32, @intFromFloat(center_x + dx / distortion_factor));
             const source_y = @as(i32, @intFromFloat(center_y + dy / distortion_factor));
 
-            if (source_x >= 0 and source_x < @as(i32, @intCast(self.width)) and
-                source_y >= 0 and source_y < @as(i32, @intCast(self.height)))
+            if (source_x >= 0 and source_x < @as(i32, @intCast(canvas.width)) and
+                source_y >= 0 and source_y < @as(i32, @intCast(canvas.height)))
             {
-                const dest_index = (y * self.width + x) * 4;
-                const source_index = (@as(usize, @intCast(source_y)) * self.width + @as(usize, @intCast(source_x))) * 4;
+                const dest_index = (y * canvas.width + x) * 4;
+                const source_index = (@as(usize, @intCast(source_y)) * canvas.width + @as(usize, @intCast(source_x))) * 4;
 
-                self.buffer[dest_index] = temp_buffer[source_index];
-                self.buffer[dest_index + 1] = temp_buffer[source_index + 1];
-                self.buffer[dest_index + 2] = temp_buffer[source_index + 2];
-                self.buffer[dest_index + 3] = temp_buffer[source_index + 3];
+                canvas.buffer[dest_index] = temp_buffer[source_index];
+                canvas.buffer[dest_index + 1] = temp_buffer[source_index + 1];
+                canvas.buffer[dest_index + 2] = temp_buffer[source_index + 2];
+                canvas.buffer[dest_index + 3] = temp_buffer[source_index + 3];
             }
         }
+    }
+}
+
+fn renderWetSpotOnCanvas(canvas: *Canvas, center: Point, radius: f32, color: Color) void {
+    const screen_pos = canvas.translateToScreenSpace(center.position[0], center.position[1]);
+    const x0 = screen_pos[0];
+    const y0 = screen_pos[1];
+    const r = @as(i32, @intFromFloat(radius * @as(f32, @floatFromInt(canvas.width)) * 0.5));
+
+    // Calculate bounds
+    const left = @max(0, x0 - r);
+    const right = @min(@as(i32, @intCast(canvas.width)) - 1, x0 + r);
+    const top = @max(0, y0 - r);
+    const bottom = @min(@as(i32, @intCast(canvas.height)) - 1, y0 + r);
+
+    // If the spot is completely outside the canvas, return early
+    if (left > right or top > bottom) {
+        return;
+    }
+
+    const spot_color = color.toRGBA();
+    const max_alpha = spot_color[3];
+
+    var prng = std.rand.DefaultPrng.init(0); // You can use a different seed for variety
+    const random = prng.random();
+
+    var y: i32 = top;
+    while (y <= bottom) : (y += 1) {
+        var x: i32 = left;
+        while (x <= right) : (x += 1) {
+            const dx = x - x0;
+            const dy = y - y0;
+            const distance_sq = dx * dx + dy * dy;
+            if (distance_sq <= r * r) {
+                const distance = @sqrt(@as(f32, @floatFromInt(distance_sq)));
+                const normalized_distance = distance / @as(f32, @floatFromInt(r));
+
+                // Create irregular edge
+                const noise = (random.float(f32) - 0.5) * 0.3;
+                const edge_factor = normalized_distance + noise;
+
+                if (edge_factor < 1.0) {
+                    // Soften the edge and create more irregular shape
+                    const alpha_factor = std.math.pow(f32, 1.0 - edge_factor, 3.0);
+                    const alpha = @as(u8, @intFromFloat(@as(f32, @floatFromInt(max_alpha)) * alpha_factor));
+
+                    const index = (@as(usize, @intCast(y)) * canvas.width + @as(usize, @intCast(x))) * 4;
+                    canvas.buffer[index] = blendColor(canvas.buffer[index], spot_color[0], alpha);
+                    canvas.buffer[index + 1] = blendColor(canvas.buffer[index + 1], spot_color[1], alpha);
+                    canvas.buffer[index + 2] = blendColor(canvas.buffer[index + 2], spot_color[2], alpha);
+                }
+            }
+        }
+    }
+}
+
+fn blendColor(bg: u8, fg: u8, alpha: u8) u8 {
+    const fg_component = @as(u16, fg) * @as(u16, alpha);
+    const bg_component = @as(u16, bg) * (255 - @as(u16, alpha));
+    return @intCast((fg_component + bg_component) / 255);
+}
+
+fn drawWigglyLineOnCanvas(canvas: *Canvas, start: Point, end: Point, amplitude: f32, frequency: f32, shift: f32, stroke_width: f32, color: Color) void {
+    const dx = end.position[0] - start.position[0];
+    const dy = end.position[1] - start.position[1];
+    const length = @sqrt(dx * dx + dy * dy);
+    const inv_length = 1.0 / length;
+
+    const perpendicular_x = -dy * inv_length;
+    const perpendicular_y = dx * inv_length;
+
+    const steps = 96;
+    const step_size = 1.0 / @as(f32, @floatFromInt(steps));
+    const angle_step = frequency * std.math.tau * step_size;
+
+    var t: f32 = 0;
+    var angle: f32 = shift * std.math.tau; // Initialize angle with shift
+    var prev_x = start.position[0];
+    var prev_y = start.position[1];
+
+    var point1 = Point.init();
+    var point2 = Point.init();
+
+    while (t <= 1.0) : ({
+        t += step_size;
+        angle += angle_step;
+    }) {
+        const x = start.position[0] + t * dx;
+        const y = start.position[1] + t * dy;
+
+        const wave_offset = amplitude * @sin(angle);
+        const wiggly_x = x + wave_offset * perpendicular_x;
+        const wiggly_y = y + wave_offset * perpendicular_y;
+
+        point1.position = .{ prev_x, prev_y };
+        point2.position = .{ wiggly_x, wiggly_y };
+        canvas.drawLine(point1, point2, stroke_width, color);
+
+        prev_x = wiggly_x;
+        prev_y = wiggly_y;
     }
 }

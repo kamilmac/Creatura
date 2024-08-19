@@ -46,9 +46,7 @@ pub const Point = struct {
     }
 
     pub fn addRotation(self: *Point, speed: f32, radius: f32) *Point {
-        self.rotation.speed = speed;
-        self.rotation.radius = radius;
-        self.rotation.angle = 0;
+        addRotationOnPoint(self, speed, radius);
         return self;
     }
 
@@ -73,6 +71,13 @@ fn initPoint() Point {
             .angle = 0,
         },
     };
+}
+
+pub fn addRotationOnPoint(point: *Point, speed: f32, radius: f32) *Point {
+    point.rotation.speed = speed;
+    point.rotation.radius = radius;
+    point.rotation.angle = 0;
+    return point;
 }
 
 fn updatePoint(point: *Point) void {

@@ -91,7 +91,7 @@ export fn go(mouseX: f32, mouseY: f32) [*]const u8 {
     canvas.drawWigglyLine(points[7], points[1], 0.05, points[7].position[0] * 20, points[7].position[1] * 2, 0.01, .Black);
 
     canvas.fastBlur(1, 6, points[0]);
-    canvas.chromaticAberration(4, 3);
+    canvas.chromaticAberration(4, 4);
     canvas.applyLensDistortion(384);
     canvas.addFilmGrain(0.3);
     return canvas.getBufferPtr();
