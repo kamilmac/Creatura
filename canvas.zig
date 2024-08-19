@@ -112,6 +112,60 @@ pub const Canvas = struct {
         }
     }
 
+    pub fn renderCoffeeSpot(self: *Canvas, center: Point, radius: f32, color: Color) void {
+        const screen_pos = self.translateToScreenSpace(center.position[0], center.position[1]);
+        const x0 = screen_pos[0];
+        const y0 = screen_pos[1];
+        const r = @as(i32, @intFromFloat(radius * @as(f32, @floatFromInt(self.width)) * 0.5));
+
+        const spot_color = color.toRGBA();
+        const max_alpha = spot_color[3];
+
+        var prng = std.rand.DefaultPrng.init(0); // You can use a different seed for variety
+        const random = prng.random();
+
+        var y: i32 = -r;
+        while (y <= r) : (y += 1) {
+            var x: i32 = -r;
+            while (x <= r) : (x += 1) {
+                const dx = x;
+                const dy = y;
+                const distance_sq = dx * dx + dy * dy;
+                if (distance_sq <= r * r) {
+                    const distance = @sqrt(@as(f32, @floatFromInt(distance_sq)));
+                    const normalized_distance = distance / @as(f32, @floatFromInt(r));
+
+                    // Create irregular edge
+                    const noise = (random.float(f32) - 0.5) * 0.3;
+                    const edge_factor = normalized_distance + noise;
+
+                    if (edge_factor < 1.0) {
+                        // Soften the edge and create more irregular shape
+                        const alpha_factor = std.math.pow(f32, 1.0 - edge_factor, 3.0);
+                        const alpha = @as(u8, @intFromFloat(@as(f32, @floatFromInt(max_alpha)) * alpha_factor));
+
+                        const pixel_x = x0 + x;
+                        const pixel_y = y0 + y;
+                        if (pixel_x >= 0 and pixel_x < @as(i32, @intCast(self.width)) and
+                            pixel_y >= 0 and pixel_y < @as(i32, @intCast(self.height)))
+                        {
+                            const index = (@as(usize, @intCast(pixel_y)) * self.width + @as(usize, @intCast(pixel_x))) * 4;
+                            self.buffer[index] = blendColor(self.buffer[index], spot_color[0], alpha);
+                            self.buffer[index + 1] = blendColor(self.buffer[index + 1], spot_color[1], alpha);
+                            self.buffer[index + 2] = blendColor(self.buffer[index + 2], spot_color[2], alpha);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn blendColor(bg: u8, fg: u8, alpha: u8) u8 {
+        const fg_component = @as(u16, fg) * @as(u16, alpha);
+        const bg_component = @as(u16, bg) * (255 - @as(u16, alpha));
+        return @intCast((fg_component + bg_component) / 255);
+    }
+
     fn translateToScreenSpace(canvas: *const Canvas, x: f32, y: f32) [2]i32 {
         return translateToScreenSpaceOnCanvas(canvas, x, y);
     }

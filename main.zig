@@ -15,6 +15,7 @@ var points = [_]Point{
     Point.init(),
     Point.init(),
     Point.init(),
+    Point.init(),
 };
 
 var canvas: Canvas = undefined;
@@ -54,6 +55,9 @@ export fn init(width: usize, height: usize) void {
     _ = points[7]
         .setPosition(-0.6, -0.6);
     // .setOscillation(0.001, 0.001, 1.3, 0.3);
+
+    _ = points[8]
+        .setPosition(-0.6, -0.0);
 }
 
 export fn go(mouseX: f32, mouseY: f32) [*]const u8 {
@@ -66,7 +70,10 @@ export fn go(mouseX: f32, mouseY: f32) [*]const u8 {
     for (&points) |*point| {
         _ = point.update();
     }
-    canvas.paintCircle(points[0], 0.3, 0.01, .Black);
+
+    canvas.renderCoffeeSpot(points[0], 3.0, .Red);
+
+    // canvas.paintCircle(points[0], 0.3, 0.01, .Blue);
     canvas.paintCircle(points[1], 0.1, 0.4, .Black);
     canvas.paintCircle(points[2], 0.3, 0.01, .Black);
     canvas.paintCircle(points[3], 0.3, @abs(points[0].position[1]) / 4 + 0.01, .Black);
@@ -86,7 +93,7 @@ export fn go(mouseX: f32, mouseY: f32) [*]const u8 {
     canvas.fastBlur(1, 6, points[0]);
     canvas.chromaticAberration(4, 3);
     canvas.applyLensDistortion(384);
-    canvas.addFilmGrain(0.35);
+    canvas.addFilmGrain(0.3);
     return canvas.getBufferPtr();
 }
 

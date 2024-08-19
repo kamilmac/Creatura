@@ -4,6 +4,7 @@ pub const Color = enum(u32) {
     Blue = 0x0000FFFF,
     Yellow = 0xFFFF00FF,
     Black = 0x000000FF,
+    LightGrey = 0xCCCCCCFF,
     White = 0xFFFFFFFF,
     // Add more colors as needed
 
