@@ -46,8 +46,7 @@ pub const Point = struct {
     }
 
     pub fn addRotation(self: *Point, speed: f32, radius: f32) *Point {
-        addRotationOnPoint(self, speed, radius);
-        return self;
+        return addRotationOnPoint(self, speed, radius);
     }
 
     fn oscillate(self: *Point) void {
