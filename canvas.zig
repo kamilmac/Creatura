@@ -80,7 +80,7 @@ pub const Canvas = struct {
         const perpendicular_x = -dy * inv_length;
         const perpendicular_y = dx * inv_length;
 
-        const steps = 64;
+        const steps = 96;
         const step_size = 1.0 / @as(f32, @floatFromInt(steps));
         const angle_step = frequency * std.math.tau * step_size;
 
@@ -336,12 +336,12 @@ fn applyChromaticAberration(self: *Canvas, max_offset_x: i32, max_offset_y: i32)
     }
 }
 
-fn applyFastBlur(canvas: *Canvas, min_radius: usize, max_radius: usize, center_point: Point) void {
-    const center_x = (center_point.position[0] + 0.5) * @as(f32, @floatFromInt(canvas.width));
-    const center_y = (-center_point.position[1] + 0.5) * @as(f32, @floatFromInt(canvas.height));
+fn applyFastBlur(canvas: *Canvas, min_radius: usize, max_radius: usize, center: Point) void {
+    const center_x = (center.position[0] + 1.0) * 0.5 * @as(f32, @floatFromInt(canvas.width));
+    const center_y = (1.0 - center.position[1]) * 0.5 * @as(f32, @floatFromInt(canvas.height));
     const max_distance = @sqrt(@as(f32, @floatFromInt(canvas.width * canvas.width + canvas.height * canvas.height))) / 2;
 
-    // Calculate integral image (unchanged)
+    // Calculate integral image
     var y: usize = 0;
     while (y <= canvas.height) : (y += 1) {
         var x: usize = 0;
@@ -373,10 +373,8 @@ fn applyFastBlur(canvas: *Canvas, min_radius: usize, max_radius: usize, center_p
             const dx = @as(f32, @floatFromInt(x)) - center_x;
             const dy = @as(f32, @floatFromInt(y)) - center_y;
             const distance = @sqrt(dx * dx + dy * dy);
-
-            // Ensure min_radius at center, smoothly transitioning to max_radius
-            const blur_factor = std.math.pow(f32, @min(distance / max_distance, 1.0), 2);
-            const radius = min_radius + @as(usize, @intFromFloat(blur_factor * @as(f32, @floatFromInt(max_radius - min_radius))));
+            const blur_factor = @min(distance / max_distance, 1.0);
+            const radius = @as(usize, @intFromFloat(@as(f32, @floatFromInt(min_radius)) + blur_factor * @as(f32, @floatFromInt(max_radius - min_radius))));
 
             const x1 = if (x >= radius) x - radius else 0;
             const y1 = if (y >= radius) y - radius else 0;

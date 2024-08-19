@@ -28,6 +28,7 @@ export fn init(width: usize, height: usize) void {
     _ = points[0]
         .setPosition(0.9, -0.9)
     // .setOscillation(0.04, 0.04, 2, 1)
+        .addRotation(0.1, 0.05)
         .setVelocity(-0.008, 0.004);
     _ = points[1]
         .setPosition(0.0, 0.0)
@@ -51,19 +52,19 @@ export fn init(width: usize, height: usize) void {
         .setPosition(0.6, -0.6)
         .setOscillation(0.001, 0.001, 1.3, 0.3);
     _ = points[7]
-        .setPosition(-0.6, -0.6)
-        .addRotation(0.1, 0.02);
+        .setPosition(-0.6, -0.6);
     // .setOscillation(0.001, 0.001, 1.3, 0.3);
 }
 
 export fn go(mouseX: f32, mouseY: f32) [*]const u8 {
     canvas.clear();
 
-    for (&points) |*point| {
-        _ = point.update();
-    }
     if (mouseX != 0 and mouseY != 0) {
         _ = points[0].setPosition(mouseX, mouseY);
+    }
+
+    for (&points) |*point| {
+        _ = point.update();
     }
     canvas.paintCircle(points[0], 0.3, 0.01, .Black);
     canvas.paintCircle(points[1], 0.1, 0.4, .Black);
@@ -83,7 +84,7 @@ export fn go(mouseX: f32, mouseY: f32) [*]const u8 {
     canvas.drawWigglyLine(points[7], points[1], 0.05, points[7].position[0] * 20, points[7].position[1] * 2, 0.01, .Black);
 
     canvas.fastBlur(1, 6, points[0]);
-    canvas.chromaticAberration(2, 2);
+    canvas.chromaticAberration(4, 3);
     canvas.applyLensDistortion(384);
     canvas.addFilmGrain(0.35);
     return canvas.getBufferPtr();
