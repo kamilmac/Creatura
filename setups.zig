@@ -72,3 +72,55 @@ pub fn animateA(c: *Canvas, p: *[16]Point, mx: f32, my: f32) void {
     c.applyLensDistortion(384);
     c.addFilmGrain(0.3);
 }
+
+pub fn setupB(c: *Canvas, p: *[16]Point) void {
+    c.setClearColor(.White);
+    _ = p[0]
+        .setPosition(0.0, 0.0);
+    _ = p[1]
+        .setPosition(0.4, -0.4)
+        .addRotation(0.01, 0.01);
+    _ = p[2]
+        .setPosition(0.4, 0.4)
+        .addRotation(0.02, 0.02);
+    _ = p[3]
+        .setPosition(-0.4, -0.4)
+        .addRotation(0.02, 0.05);
+    _ = p[4]
+        .setPosition(-0.4, 0.4)
+        .addRotation(0.03, 0.03);
+}
+
+pub fn animateB(c: *Canvas, p: *[16]Point, mx: f32, my: f32) void {
+    c.clear();
+
+    if (mx != 0 and my != 0) {
+        _ = p[0].setPosition(mx, my);
+    }
+
+    for (p) |*point| {
+        _ = point.update();
+    }
+
+    c.renderWetSpot(p[1], 2.0, .Black);
+    c.renderWetSpot(p[2], 3.0, .LightGrey);
+    c.renderWetSpot(p[3], 1.0, .Black);
+    c.renderWetSpot(p[4], 2.0, .LightGrey);
+
+    // c.drawBezierCurve(p[1], p[2], p[0], 0.212, .Black);
+    // c.drawBezierCurve(p[2], p[3], p[0], 0.212, .Black);
+    // c.drawBezierCurve(p[3], p[4], p[0], 0.212, .Black);
+    // c.drawBezierCurve(p[4], p[1], p[0], 0.212, .Black);
+
+    c.drawWigglyLine(p[1], p[2], 0.05, 10, 2, 0.03, .White);
+    c.drawWigglyLine(p[2], p[3], 0.05, 20, 2, 0.03, .White);
+    c.drawWigglyLine(p[3], p[4], 0.05, 40, 2, 0.03, .White);
+    c.drawWigglyLine(p[4], p[1], 0.05, 20, 2, 0.03, .White);
+    c.drawWigglyLine(p[3], p[1], 0.05, 8, 2, 0.03, .White);
+    c.drawWigglyLine(p[2], p[4], 0.05, 20, 2, 0.03, .White);
+
+    c.fastBlur(1, 16, p[0]);
+    // c.chromaticAberration(4, 4);
+    c.applyLensDistortion(384);
+    c.addFilmGrain(0.1);
+}
