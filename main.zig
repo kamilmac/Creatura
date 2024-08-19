@@ -71,12 +71,12 @@ export fn go(mouseX: f32, mouseY: f32) [*]const u8 {
         _ = point.update();
     }
 
-    canvas.renderCoffeeSpot(points[0], 3.0, .Red);
-
     // canvas.paintCircle(points[0], 0.3, 0.01, .Blue);
     canvas.paintCircle(points[1], 0.1, 0.4, .Black);
     canvas.paintCircle(points[2], 0.3, 0.01, .Black);
     canvas.paintCircle(points[3], 0.3, @abs(points[0].position[1]) / 4 + 0.01, .Black);
+
+    canvas.renderWetSpot(points[0], 2.0, .LightGrey);
 
     canvas.paintCircle(points[4], 0.5, @abs(points[0].position[1]) / 4 + 0.01, .Black);
     canvas.paintCircle(points[5], 0.37, @abs(points[1].position[1]) / 3 + 0.01, .Black);

@@ -112,11 +112,22 @@ pub const Canvas = struct {
         }
     }
 
-    pub fn renderCoffeeSpot(self: *Canvas, center: Point, radius: f32, color: Color) void {
+    pub fn renderWetSpot(self: *Canvas, center: Point, radius: f32, color: Color) void {
         const screen_pos = self.translateToScreenSpace(center.position[0], center.position[1]);
         const x0 = screen_pos[0];
         const y0 = screen_pos[1];
         const r = @as(i32, @intFromFloat(radius * @as(f32, @floatFromInt(self.width)) * 0.5));
+
+        // Calculate bounds
+        const left = @max(0, x0 - r);
+        const right = @min(@as(i32, @intCast(self.width)) - 1, x0 + r);
+        const top = @max(0, y0 - r);
+        const bottom = @min(@as(i32, @intCast(self.height)) - 1, y0 + r);
+
+        // If the spot is completely outside the canvas, return early
+        if (left > right or top > bottom) {
+            return;
+        }
 
         const spot_color = color.toRGBA();
         const max_alpha = spot_color[3];
@@ -124,12 +135,12 @@ pub const Canvas = struct {
         var prng = std.rand.DefaultPrng.init(0); // You can use a different seed for variety
         const random = prng.random();
 
-        var y: i32 = -r;
-        while (y <= r) : (y += 1) {
-            var x: i32 = -r;
-            while (x <= r) : (x += 1) {
-                const dx = x;
-                const dy = y;
+        var y: i32 = top;
+        while (y <= bottom) : (y += 1) {
+            var x: i32 = left;
+            while (x <= right) : (x += 1) {
+                const dx = x - x0;
+                const dy = y - y0;
                 const distance_sq = dx * dx + dy * dy;
                 if (distance_sq <= r * r) {
                     const distance = @sqrt(@as(f32, @floatFromInt(distance_sq)));
@@ -144,16 +155,10 @@ pub const Canvas = struct {
                         const alpha_factor = std.math.pow(f32, 1.0 - edge_factor, 3.0);
                         const alpha = @as(u8, @intFromFloat(@as(f32, @floatFromInt(max_alpha)) * alpha_factor));
 
-                        const pixel_x = x0 + x;
-                        const pixel_y = y0 + y;
-                        if (pixel_x >= 0 and pixel_x < @as(i32, @intCast(self.width)) and
-                            pixel_y >= 0 and pixel_y < @as(i32, @intCast(self.height)))
-                        {
-                            const index = (@as(usize, @intCast(pixel_y)) * self.width + @as(usize, @intCast(pixel_x))) * 4;
-                            self.buffer[index] = blendColor(self.buffer[index], spot_color[0], alpha);
-                            self.buffer[index + 1] = blendColor(self.buffer[index + 1], spot_color[1], alpha);
-                            self.buffer[index + 2] = blendColor(self.buffer[index + 2], spot_color[2], alpha);
-                        }
+                        const index = (@as(usize, @intCast(y)) * self.width + @as(usize, @intCast(x))) * 4;
+                        self.buffer[index] = blendColor(self.buffer[index], spot_color[0], alpha);
+                        self.buffer[index + 1] = blendColor(self.buffer[index + 1], spot_color[1], alpha);
+                        self.buffer[index + 2] = blendColor(self.buffer[index + 2], spot_color[2], alpha);
                     }
                 }
             }
