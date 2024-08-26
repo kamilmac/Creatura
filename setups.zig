@@ -1,7 +1,8 @@
 const Canvas = @import("canvas.zig").Canvas;
 const Point = @import("point.zig").Point;
+const NUM_POINTS = @import("main.zig").NUM_POINTS;
 
-pub fn setupA(c: *Canvas, p: *[16]Point) void {
+pub fn setupA(c: *Canvas, p: *[NUM_POINTS]Point) void {
     c.setClearColor(.White);
     _ = p[0]
         .setPosition(0.9, -0.9)
@@ -37,7 +38,7 @@ pub fn setupA(c: *Canvas, p: *[16]Point) void {
         .setPosition(-0.6, -0.0);
 }
 
-pub fn animateA(c: *Canvas, p: *[16]Point, mx: f32, my: f32) void {
+pub fn animateA(c: *Canvas, p: *[NUM_POINTS]Point, mx: f32, my: f32) void {
     c.clear();
 
     if (mx != 0 and my != 0) {

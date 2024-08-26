@@ -6,32 +6,18 @@ const setup = @import("setups.zig").setupA;
 const animate = @import("setups.zig").animateA;
 const Allocator = std.mem.Allocator;
 
-// Allocate 2 points on stack
-var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-var points = [16]Point{
-    Point.init(),
-    Point.init(),
-    Point.init(),
-    Point.init(),
-    Point.init(),
-    Point.init(),
-    Point.init(),
-    Point.init(),
-    Point.init(),
-    Point.init(),
-    Point.init(),
-    Point.init(),
-    Point.init(),
-    Point.init(),
-    Point.init(),
-    Point.init(),
-};
+pub const NUM_POINTS: i32 = 128;
 
+var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+var points: [NUM_POINTS]Point = undefined;
 var canvas: Canvas = undefined;
 
 export fn init(width: usize, height: usize) void {
     const allocator = gpa.allocator();
     canvas = Canvas.init(allocator, width, height) catch unreachable;
+    for (&points) |*point| {
+        point.* = Point.init();
+    }
     setup(&canvas, &points);
 }
 
