@@ -2,11 +2,11 @@ const std = @import("std");
 const math = std.math;
 const Canvas = @import("canvas.zig").Canvas;
 const Point = @import("point.zig").Point;
-const setup = @import("setups.zig").setupA;
-const animate = @import("setups.zig").animateA;
+const setup = @import("setups.zig").setupB;
+const animate = @import("setups.zig").animateB;
 const Allocator = std.mem.Allocator;
 
-pub const NUM_POINTS: i32 = 128;
+pub const NUM_POINTS: i32 = 16;
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 var points: [NUM_POINTS]Point = undefined;

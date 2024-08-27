@@ -9,9 +9,10 @@ pub const Point = struct {
         frequency: [2]f32,
         offset: f32,
     },
-    rotation: struct {
-        speed: f32,
+    orbit: struct {
+        center: ?*Point,
         radius: f32,
+        speed: f32,
         angle: f32,
     },
 
@@ -45,8 +46,12 @@ pub const Point = struct {
         return self;
     }
 
-    pub fn addRotation(self: *Point, speed: f32, radius: f32) *Point {
-        return addRotationOnPoint(self, speed, radius);
+    pub fn orbitAround(self: *Point, center: *Point, radius: f32, speed: f32) *Point {
+        self.orbit.center = center;
+        self.orbit.radius = radius;
+        self.orbit.speed = speed;
+        self.orbit.angle = 0;
+        return self;
     }
 
     fn oscillate(self: *Point) void {
@@ -64,19 +69,13 @@ fn initPoint() Point {
             .frequency = .{ 0, 0 },
             .offset = 0,
         },
-        .rotation = .{
-            .speed = 0,
+        .orbit = .{
+            .center = null,
             .radius = 0,
+            .speed = 0,
             .angle = 0,
         },
     };
-}
-
-pub fn addRotationOnPoint(point: *Point, speed: f32, radius: f32) *Point {
-    point.rotation.speed = speed;
-    point.rotation.radius = radius;
-    point.rotation.angle = 0;
-    return point;
 }
 
 fn updatePoint(point: *Point) void {
@@ -97,17 +96,18 @@ fn updatePoint(point: *Point) void {
     point.velocity[0] *= 0.994;
     point.velocity[1] *= 0.994;
 
+    // Apply orbit
+    if (point.orbit.center) |center| {
+        point.orbit.angle += point.orbit.speed;
+        const orbit_x = point.orbit.radius * @cos(point.orbit.angle);
+        const orbit_y = point.orbit.radius * @sin(point.orbit.angle);
+        point.position[0] = center.position[0] + orbit_x;
+        point.position[1] = center.position[1] + orbit_y;
+    }
+
     // Basic boundary check
     point.position[0] = @max(-1.0, @min(point.position[0], 1.0));
     point.position[1] = @max(-1.0, @min(point.position[1], 1.0));
-
-    if (point.rotation.radius > 0) {
-        point.rotation.angle += point.rotation.speed;
-        const rotation_x = point.rotation.radius * @cos(point.rotation.angle);
-        const rotation_y = point.rotation.radius * @sin(point.rotation.angle);
-        point.position[0] += rotation_x;
-        point.position[1] += rotation_y;
-    }
 }
 
 fn oscillatePoint(point: *Point) void {

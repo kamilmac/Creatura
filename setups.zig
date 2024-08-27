@@ -6,8 +6,6 @@ pub fn setupA(c: *Canvas, p: *[NUM_POINTS]Point) void {
     c.setClearColor(.White);
     _ = p[0]
         .setPosition(0.9, -0.9)
-    // .setOscillation(0.04, 0.04, 2, 1)
-        .addRotation(0.1, 0.05)
         .setVelocity(-0.008, 0.004);
     _ = p[1]
         .setPosition(0.0, 0.0)
@@ -32,8 +30,6 @@ pub fn setupA(c: *Canvas, p: *[NUM_POINTS]Point) void {
         .setOscillation(0.001, 0.001, 1.3, 0.3);
     _ = p[7]
         .setPosition(-0.6, -0.6);
-    // .setOscillation(0.001, 0.001, 1.3, 0.3);
-
     _ = p[8]
         .setPosition(-0.6, -0.0);
 }
@@ -49,7 +45,6 @@ pub fn animateA(c: *Canvas, p: *[NUM_POINTS]Point, mx: f32, my: f32) void {
         _ = point.update();
     }
 
-    // c.paintCircle(p[0], 0.3, 0.01, .Blue);
     c.paintCircle(p[1], 0.1, 0.4, .Black);
     c.paintCircle(p[2], 0.3, 0.01, .Black);
     c.paintCircle(p[3], 0.3, @abs(p[0].position[1]) / 4 + 0.01, .Black);
@@ -74,54 +69,45 @@ pub fn animateA(c: *Canvas, p: *[NUM_POINTS]Point, mx: f32, my: f32) void {
     c.addFilmGrain(0.3);
 }
 
-pub fn setupB(c: *Canvas, p: *[16]Point) void {
+pub fn setupB(c: *Canvas, p: *[NUM_POINTS]Point) void {
     c.setClearColor(.White);
     _ = p[0]
         .setPosition(0.0, 0.0);
     _ = p[1]
         .setPosition(0.4, -0.4)
-        .addRotation(0.01, 0.01);
+        .orbitAround(&p[0], 0.2, 0.2);
     _ = p[2]
         .setPosition(0.4, 0.4)
-        .addRotation(0.02, 0.02);
+        .orbitAround(&p[1], 0.2, 0.22);
     _ = p[3]
         .setPosition(-0.4, -0.4)
-        .addRotation(0.02, 0.05);
+        .orbitAround(&p[2], 0.2, 0.24);
     _ = p[4]
         .setPosition(-0.4, 0.4)
-        .addRotation(0.03, 0.03);
+        .orbitAround(&p[3], 0.2, 0.26);
 }
 
-pub fn animateB(c: *Canvas, p: *[16]Point, mx: f32, my: f32) void {
+pub fn animateB(c: *Canvas, p: *[NUM_POINTS]Point, mx: f32, my: f32) void {
     c.clear();
 
     if (mx != 0 and my != 0) {
-        _ = p[0].setPosition(mx, my);
+        _ = p[0].setPosition(0.0, 0.0);
     }
 
     for (p) |*point| {
         _ = point.update();
     }
 
-    c.renderWetSpot(p[1], 2.0, .Black);
-    c.renderWetSpot(p[2], 3.0, .LightGrey);
-    c.renderWetSpot(p[3], 1.0, .Black);
-    c.renderWetSpot(p[4], 2.0, .LightGrey);
-
-    // c.drawBezierCurve(p[1], p[2], p[0], 0.212, .Black);
-    // c.drawBezierCurve(p[2], p[3], p[0], 0.212, .Black);
-    // c.drawBezierCurve(p[3], p[4], p[0], 0.212, .Black);
-    // c.drawBezierCurve(p[4], p[1], p[0], 0.212, .Black);
-
-    c.drawWigglyLine(p[1], p[2], 0.05, 10, 2, 0.03, .White);
-    c.drawWigglyLine(p[2], p[3], 0.05, 20, 2, 0.03, .White);
-    c.drawWigglyLine(p[3], p[4], 0.05, 40, 2, 0.03, .White);
-    c.drawWigglyLine(p[4], p[1], 0.05, 20, 2, 0.03, .White);
-    c.drawWigglyLine(p[3], p[1], 0.05, 8, 2, 0.03, .White);
-    c.drawWigglyLine(p[2], p[4], 0.05, 20, 2, 0.03, .White);
+    c.paintCircle(p[1], 0.1, 0.03, .Black);
+    c.renderWetSpot(p[1], 0.2, .Red);
+    c.paintCircle(p[2], 0.1, 0.06, .Black);
+    c.renderWetSpot(p[2], 0.3, .Blue);
+    c.paintCircle(p[3], 0.1, 0.08, .Black);
+    c.renderWetSpot(p[3], 0.1, .Yellow);
+    c.paintCircle(p[4], 0.1, 0.1, .Black);
 
     c.fastBlur(1, 16, p[0]);
     // c.chromaticAberration(4, 4);
     c.applyLensDistortion(384);
-    c.addFilmGrain(0.1);
+    c.addFilmGrain(0.3);
 }
