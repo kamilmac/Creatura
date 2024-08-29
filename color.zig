@@ -1,8 +1,8 @@
 pub const Color = enum(u32) {
-    Red = 0xFF0000FF,
-    Green = 0x00FF00FF,
-    Blue = 0x0000FFFF,
-    Yellow = 0xFFFF00FF,
+    Red = 0xC40C0CFF,
+    Green = 0xFF6500FF,
+    Blue = 0xFF8A08FF,
+    Yellow = 0xFFC100FF,
     Black = 0x000000FF,
     LightGrey = 0xCCCCCCFF,
     White = 0xFFFFFFFF,

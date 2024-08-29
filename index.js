@@ -1,6 +1,6 @@
 // Constants
-const CANVAS_HEIGHT = 600;
-const CANVAS_WIDTH = 600;
+const CANVAS_HEIGHT = 512;
+const CANVAS_WIDTH = 512;
 // const RENDER_SCALE = 2;
 const RENDER_WIDTH = 512;
 const RENDER_HEIGHT = 512;
@@ -101,6 +101,10 @@ function initWebGL() {
     mouseY = -2 * (1 - (event.clientY - rect.top) / CANVAS_HEIGHT - 0.5); // Invert Y-axis
   });
 
+  canvas.addEventListener('click', (event) => {
+    wasm.exports.toggle();
+  });
+
   return true;
 }
 
@@ -182,10 +186,6 @@ function animate(currentTime) {
   } catch (e) {
     console.warn(e);
   }
-}
-
-function addMouseListeners() {
-  window.addEventListener()  
 }
 
 function main() {
