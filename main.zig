@@ -2,8 +2,6 @@ const std = @import("std");
 const math = std.math;
 const Canvas = @import("canvas.zig").Canvas;
 const Point = @import("point.zig").Point;
-const setupA = @import("setups.zig").setupA;
-const animateA = @import("setups.zig").animateA;
 const setupB = @import("setups.zig").setupB;
 const animateB = @import("setups.zig").animateB;
 const Allocator = std.mem.Allocator;
@@ -16,8 +14,8 @@ const Setup = struct {
 };
 
 const setups = [_]Setup{
-    .{ .setup = setupA, .animate = animateA },
-    .{ .setup = setupB, .animate = animateB },
+    .{ .setup = @import("setups.zig").setupA, .animate = @import("setups.zig").animateA },
+    .{ .setup = @import("setups.zig").setupB, .animate = @import("setups.zig").animateB },
 };
 
 var current_setup: usize = 0;
