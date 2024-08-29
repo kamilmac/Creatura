@@ -102,15 +102,15 @@ function initWebGL() {
     mouseX = 2 * ((event.clientX - rect.left) / CANVAS_WIDTH - 0.5);
     mouseY = -2 * (1 - (event.clientY - rect.top) / CANVAS_HEIGHT - 0.5); // Invert Y-axis
 
-    const rotateX = -((event.clientY - centerY) / (rect.height / 2)) * 6; // Max 10 degrees
-    const rotateY = ((event.clientX - centerX) / (rect.width / 2)) * 6; // Max 10 degrees
+    const rotateX = -((event.clientY - centerY) / (rect.height / 2)) * 8; // Max 10 degrees
+    const rotateY = ((event.clientX - centerX) / (rect.width / 2)) * 8; // Max 10 degrees
 
     const shadowX = (event.clientX - centerX) / 22;
     const shadowY = (event.clientY - centerY) / 22;
     const shadowBlur = Math.sqrt(shadowX * shadowX + shadowY * shadowY);
 
-    // canvas.style.boxShadow = `${shadowX}px ${shadowY}px ${shadowBlur}px rgba(0,0,0,0.2)`;
-    // canvas.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
+    canvas.style.boxShadow = `${shadowX}px ${shadowY}px ${shadowBlur}px rgba(0,0,0,0.2)`;
+    canvas.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
   });
 
   canvas.addEventListener('click', (event) => {
