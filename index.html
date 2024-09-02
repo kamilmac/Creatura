@@ -8,6 +8,7 @@
     body {
       margin: 0;
       padding: 0;
+      background: black;
     }
     #root {
       height: 100vh;
@@ -15,31 +16,27 @@
       align-content: center;
       text-align: center;
       margin-top: -6vh;
+      position: relative;
     }
     img {
-      width: 400px;
+      max-width: 200px;
+      width: 90vw;
       margin: 0 auto 8px;
-    }
-    #legend {
-      font-family: monospace;
-      font-size: 12px;
-      margin: 0 auto 24px;
-      background: #1c1c1c;
-      color: white;
-      width: fit-content;
-      padding: 6px 12px;
-      border-radius: 12px;
+      filter: invert(1);
     }
     #info {
-      font-family: monospace;
-      font-size: 12px;
-      color: #6c6c6c;
-      width: 512px;
-      line-height: 16px;
-      margin: 0 auto 32px;
+      font-family: sans-serif;
+      font-size: 14px;
+      color: #ddd;
+      max-width: 512px;
+      line-height: 18px;
+      margin: 0 auto 16px;
+      padding: 8px;
     }
     canvas {
-      border-radius: 50%;
+      border-radius: 8px;
+      border: 1px solid #111;
+      margin: 8px;
     }
     canvas:hover {
       transition: transform 0.1s ease;
@@ -50,9 +47,9 @@
   <div id="root">
     <img src="/creatura.png" />
     <div id="info">
-      A quirky, interactive canvas experiment powered by Zig (wasm) and WebGL. Mess around with interactive shapes that react to each other and your mouse movements.
+      A quirky, interactive canvas experiment powered by Zig (wasm) and WebGL.
+      Move your mouse to interact with shapes, click to explore new canvases.
     </div>
-    <div id="legend">Hover and click on canvas to interact</div>
   </div>
   <script src="index.js"></script>
 </body>

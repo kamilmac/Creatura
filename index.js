@@ -1,9 +1,9 @@
 // Constants
-const CANVAS_HEIGHT = 512;
-const CANVAS_WIDTH = 512;
-// const RENDER_SCALE = 2;
 const RENDER_WIDTH = 512;
-const RENDER_HEIGHT = 512;
+const RENDER_HEIGHT = RENDER_WIDTH;
+const CANVAS_HEIGHT = getCanvasWidth();
+const CANVAS_WIDTH = getCanvasWidth();
+// const RENDER_SCALE = 2;
 const FRAME_RATE = 24;
 const FRAME_DURATION = 1000 / FRAME_RATE;
 
@@ -36,6 +36,11 @@ const fragmentShaderSource = `
 `;
 
 // Helper functions
+function getCanvasWidth() {
+  const screenWidth = window.innerWidth;
+  return Math.min(RENDER_WIDTH, screenWidth - 16);
+}
+
 function createCanvas(parentDivId, canvasWidth, canvasHeight) {
   const parentDiv = document.getElementById(parentDivId);
   const canvas = document.createElement('canvas');
@@ -97,20 +102,8 @@ function initWebGL() {
 
   canvas.addEventListener('mousemove', (event) => {
     const rect = canvas.getBoundingClientRect();
-    const centerX = rect.left + rect.width / 2;
-    const centerY = rect.top + rect.height / 2;
     mouseX = 2 * ((event.clientX - rect.left) / CANVAS_WIDTH - 0.5);
     mouseY = -2 * (1 - (event.clientY - rect.top) / CANVAS_HEIGHT - 0.5); // Invert Y-axis
-
-    const rotateX = -((event.clientY - centerY) / (rect.height / 2)) * 8; // Max 10 degrees
-    const rotateY = ((event.clientX - centerX) / (rect.width / 2)) * 8; // Max 10 degrees
-
-    const shadowX = (event.clientX - centerX) / 22;
-    const shadowY = (event.clientY - centerY) / 22;
-    const shadowBlur = Math.sqrt(shadowX * shadowX + shadowY * shadowY);
-
-    canvas.style.boxShadow = `${shadowX}px ${shadowY}px ${shadowBlur}px rgba(0,0,0,0.2)`;
-    canvas.style.transform = `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`;
   });
 
   canvas.addEventListener('click', (event) => {
