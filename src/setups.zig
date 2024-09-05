@@ -65,7 +65,7 @@ pub fn animateA(c: *Canvas, p: *[NUM_POINTS]Point, mx: f32, my: f32) void {
 
     c.fastBlur(1, 6, p[0]);
     c.chromaticAberration(4, 4);
-    // c.applyLensDistortion(384);
+    c.applyLensDistortion(384);
     c.addFilmGrain(0.3);
 }
 
@@ -140,7 +140,7 @@ pub fn animateB(c: *Canvas, p: *[NUM_POINTS]Point, mx: f32, my: f32) void {
 
     c.fastBlur(1, 16, p[0]);
     c.chromaticAberration(16, 16);
-    // c.applyLensDistortion(512);
+    c.applyLensDistortion(512);
     c.addFilmGrain(0.3);
 }
 
