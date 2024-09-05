@@ -1,3 +1,5 @@
+import init from './zig-out/bin/zigl.wasm?init';
+
 // Constants
 const RENDER_WIDTH = 512;
 const RENDER_HEIGHT = RENDER_WIDTH;
@@ -76,17 +78,8 @@ function createProgram(gl, vertexShader, fragmentShader) {
 }
 
 async function loadZigWasmModule() {
-  const response = await fetch('/zig-out/bin/zigl.wasm');
-  const bytes = await response.arrayBuffer();
-  const { instance } = await WebAssembly.instantiate(bytes, {
-    env: {
-      js_console_log: (ptr, len) => {
-        const buf = new Uint8Array(wasm.exports.memory.buffer, ptr, len);
-        const message = new TextDecoder().decode(buf);
-        console.log('ZIG: ', message);
-      }
-    }
-  });
+  console.log('locading wasm');
+  const instance = await init();
   return instance;
 }
 
